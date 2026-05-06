@@ -1,0 +1,129 @@
+app:
+  level: info
+  auth: true
+  listen: "0.0.0.0"
+  port: "8082"
+
+users:
+  - name: admin
+    token: your-api-key-here
+
+tokens:
+  - id: claude-code
+    token: sk-xxx
+
+routes:
+  # Anthropic-format route with wildcard model matching
+  claude-code:
+    api_type: anthropic
+    models:
+      # "prefix*" matches any model starting with "claude-opus" (no hyphen required)
+      - model_id: claude-opus*
+        targets:
+          - model_id: anthropic/claude-opus-4.7
+            provider: openrouter
+            api_name: default
+          - model_id: claude-opus-4.7
+            provider: anthropic
+            api_name: default
+            status: disable
+
+      - model_id: claude-sonnet*
+        targets:
+          - model_id: anthropic/claude-sonnet-4.6
+            provider: openrouter
+            api_name: default
+
+      - model_id: claude-haiku*
+        targets:
+          - model_id: anthropic/claude-haiku-4.5
+            provider: openrouter
+            api_name: default
+
+      # "*" matches any model ID (fallback)
+      - model_id: "*"
+        targets:
+          - model_id: anthropic/claude-sonnet-4.6
+            provider: openrouter
+            api_name: default
+
+  # OpenAI-format route
+  codex:
+    api_type: openai
+    models:
+      - model_id: plan
+        targets:
+          - model_id: openai/gpt-5.5
+            provider: openrouter
+            api_name: default
+          - model_id: gpt-5.5
+            provider: openai
+            api_name: default
+
+      - model_id: gpt*
+        targets:
+          - model_id: openai/gpt-5.5
+            provider: openrouter
+            api_name: default
+
+providers:
+  openrouter:
+    name: OpenRouter
+    enable: true
+    proxy: ""
+    models:
+      - model_id: openai/gpt-5.5
+      - model_id: openai/gpt-5.4
+      - model_id: anthropic/claude-opus-4.7
+      - model_id: anthropic/claude-sonnet-4.6
+      - model_id: anthropic/claude-haiku-4.5
+    apis:
+      - name: default
+        api_type: openai
+        base_url: https://openrouter.ai/api/v1
+        api_key: ""
+      - name: default
+        api_type: anthropic
+        base_url: https://openrouter.ai/api
+        api_key: ""
+
+  anthropic:
+    name: Anthropic
+    enable: false
+    models:
+      - model_id: claude-opus-4.7
+      - model_id: claude-sonnet-4.6
+      - model_id: claude-haiku-4.5
+    apis:
+      - name: default
+        api_type: anthropic
+        base_url: https://api.anthropic.com/v1
+        api_key: ""
+
+  openai:
+    name: OpenAI
+    enable: false
+    models:
+      - model_id: gpt-5.5
+      - model_id: gpt-5.4
+    apis:
+      - name: default
+        api_type: openai
+        base_url: https://api.openai.com/v1
+        api_key: ""
+
+  deepseek:
+    name: DeepSeek
+    enable: false
+    models:
+      - model_id: deepseek-v4-pro
+      - model_id: deepseek-v4-flash
+    apis:
+      - name: default
+        api_type: openai
+        base_url: https://api.deepseek.com/v1
+        api_key: ""
+      - name: default
+        api_type: anthropic
+        base_url: https://api.deepseek.com/anthropic
+        api_key: ""

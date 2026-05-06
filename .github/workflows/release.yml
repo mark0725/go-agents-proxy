@@ -69,7 +69,7 @@ jobs:
           CGO_ENABLED: 0
         run: |
           mkdir -p dist
-          BINARY_NAME="go-claude-code-proxy-${{ matrix.goos }}-${{ matrix.goarch }}"
+          BINARY_NAME="go-agents-proxy-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ -n "${{ matrix.goarm }}" ]; then
             BINARY_NAME="${BINARY_NAME}v${{ matrix.goarm }}"
           fi

@@ -1,0 +1,214 @@
+package api
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/mark0725/go-agents-proxy/internal/config"
+	"github.com/mark0725/go-agents-proxy/internal/logger"
+)
+
+// Handler holds dependencies for management API endpoints.
+type Handler struct {
+	Config *config.Manager
+	Logger *logger.Logger
+}
+
+// NewHandler creates a new API handler.
+func NewHandler(cfg *config.Manager, log *logger.Logger) *Handler {
+	return &Handler{Config: cfg, Logger: log}
+}
+
+func (h *Handler) validateAPIKey(r *http.Request) bool {
+	cfg := h.Config.Get()
+	if !cfg.App.Auth {
+		return true
+	}
+	apiKey := r.Header.Get("x-api-key")
+	if apiKey == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	for _, u := range cfg.Users {
+		if u.Token == apiKey || u.Password == apiKey {
+			return true
+		}
+	}
+	for _, t := range cfg.Tokens {
+		if t.Token == apiKey {
+			return true
+		}
+	}
+	return false
+}
+
+func sendJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func sendError(w http.ResponseWriter, status int, message string) {
+	slog.Error("api error", slog.Int("status", status), slog.String("message", message))
+	sendJSON(w, status, map[string]interface{}{
+		"error": map[string]string{
+			"type":    "api_error",
+			"message": message,
+		},
+	})
+}
+
+// RegisterRoutes registers all /api/* handlers.
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/config", h.handleConfig)
+	mux.HandleFunc("/api/logs/llm", h.handleLLMLogs)
+	mux.HandleFunc("/api/logs/app", h.handleAppLogs)
+	mux.HandleFunc("/api/routes", h.handleRoutes)
+	mux.HandleFunc("/api/providers", h.handleProviders)
+}
+
+func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		cfg := h.Config.Get()
+		sendJSON(w, http.StatusOK, cfg)
+
+	case http.MethodPost:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "Failed to read body")
+			return
+		}
+		var newCfg config.Config
+		if err := json.Unmarshal(body, &newCfg); err != nil {
+			sendError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
+			return
+		}
+		// Default RouteTarget.Enable to true when not specified.
+		for _, route := range newCfg.Routes {
+			for i := range route.Targets {
+				if route.Targets[i].Enable == nil {
+					t := true
+					route.Targets[i].Enable = &t
+				}
+			}
+		}
+		h.Config.Set(&newCfg)
+		if err := h.Config.Save(); err != nil {
+			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save config: %v", err))
+			return
+		}
+		sendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+
+	default:
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+func (h *Handler) handleLLMLogs(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 1000 {
+		limit = 100
+	}
+
+	logs, total, err := h.Logger.ReadLLMLogs(date, offset, limit)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to read logs: %v", err))
+		return
+	}
+
+	sendJSON(w, http.StatusOK, map[string]interface{}{
+		"date":   date,
+		"total":  total,
+		"offset": offset,
+		"limit":  limit,
+		"logs":   logs,
+	})
+}
+
+func (h *Handler) handleAppLogs(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 {
+		limit = 100
+	}
+
+	lines, err := h.Logger.TailAppLog(limit)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to read logs: %v", err))
+		return
+	}
+
+	sendJSON(w, http.StatusOK, map[string]interface{}{
+		"lines": lines,
+	})
+}
+
+func (h *Handler) handleRoutes(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	cfg := h.Config.Get()
+	sendJSON(w, http.StatusOK, cfg.Routes)
+}
+
+func (h *Handler) handleProviders(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	cfg := h.Config.Get()
+	sendJSON(w, http.StatusOK, cfg.Providers)
+}

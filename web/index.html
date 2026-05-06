@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Agents Proxy - Admin</title>
+    <script defer src="/static/alpine.min.js"></script>
+    <script src="/static/tailwindcss.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .tab-btn { transition: all 0.15s ease; }
+        .tab-btn:hover:not(.tab-active) { background-color: #f3f4f6; }
+        html.dark .tab-btn:hover:not(.tab-active) { background-color: #374151; }
+        .card-hover { transition: box-shadow 0.2s ease; }
+        .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        html.dark .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
+        .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .stat-card:hover { transform: translateY(-1px); }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100" x-data="adminApp()" x-init="initApp()">
+
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">A</div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight">Go Agents Proxy</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Management Dashboard</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @click="toggleDarkMode()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="Toggle dark mode">
+                    <svg x-show="!darkMode" class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg x-show="darkMode" class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
+                <div x-show="authenticated" class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="apiKey.substring(0,8)+'...'"></span>
+                    <button @click="logout()" class="text-sm text-gray-500 hover:text-red-600 px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+        <!-- Auth -->
+        <div x-show="!authenticated" class="max-w-md mx-auto mt-12">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-8">
+                <div class="text-center mb-6">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-4 shadow-sm">A</div>
+                    <h2 class="text-xl font-bold">Welcome</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your API key to access the dashboard</p>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+                        <input x-model="apiKey" @keydown.enter="login()" type="password" placeholder="sk-..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2.5 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                    </div>
+                    <button @click="login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition shadow-sm">Login</button>
+                    <p x-show="error" x-text="error" x-transition class="text-red-500 text-sm text-center"></p>
+                </div>
+            </div>
+        </div>
+
+        <template x-if="authenticated">
+            <div class="fade-in">
+                <!-- Tabs -->
+                <div class="flex gap-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-1 mb-6 overflow-x-auto">
+                    <button @click="tab = 'routes'" :class="tab === 'routes' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Routes
+                    </button>
+                    <button @click="tab = 'providers'" :class="tab === 'providers' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        Providers
+                    </button>
+                    <button @click="tab = 'users'" :class="tab === 'users' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        Users
+                    </button>
+                    <button @click="tab = 'tokens'" :class="tab === 'tokens' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                        Tokens
+                    </button>
+                    <button @click="tab = 'app-settings'" :class="tab === 'app-settings' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        App Settings
+                    </button>
+                    <button @click="tab = 'llmlogs'" :class="tab === 'llmlogs' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        LLM Logs
+                    </button>
+                    <button @click="tab = 'applogs'" :class="tab === 'applogs' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                        App Logs
+                    </button>
+                    <button @click="tab = 'test'" :class="tab === 'test' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Test
+                    </button>
+                </div>
+
+                <!-- Save/Reload bar (shown on all config tabs) -->
+                <div x-show="['app-settings','users','tokens','routes','providers'].includes(tab)" class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700 px-4 py-3">
+                    <p x-show="configMessage" x-text="configMessage" x-transition :class="configError ? 'text-red-500' : 'text-green-600 dark:text-green-400'" class="text-sm font-medium"></p>
+                    <div x-show="!configMessage" class="text-sm text-gray-500 dark:text-gray-400">Edit configuration and click Save to apply changes</div>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button @click="loadConfig()" class="text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg transition">Reload</button>
+                        <button @click="saveConfig()" class="text-sm bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-1.5 rounded-lg transition shadow-sm">Save Config</button>
+                    </div>
+                </div>
+
+                <!-- Users -->
+                <div x-show="tab === 'users'" x-cloak>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold">Users</h2>
+                            <button @click="addUser()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">+ Add User</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-2.5 text-left font-medium">Name</th>
+                                        <th class="p-2.5 text-left font-medium">Token</th>
+                                        <th class="p-2.5 text-left font-medium">Password</th>
+                                        <th class="p-2.5 text-left font-medium w-20"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(u, idx) in configUsers" :key="idx">
+                                        <tr class="border-t border-gray-100 dark:border-gray-700">
+                                            <td class="p-2"><input x-model="u.name" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"></td>
+                                            <td class="p-2"><input x-model="u.token" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"></td>
+                                            <td class="p-2"><input x-model="u.password" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"></td>
+                                            <td class="p-2"><button @click="removeUser(idx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove</button></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div x-show="configUsers.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">No users configured</div>
+                    </div>
+                </div>
+
+                <!-- Tokens -->
+                <div x-show="tab === 'tokens'" x-cloak>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold">Tokens</h2>
+                            <button @click="addToken()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition">+ Add Token</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-2.5 text-left font-medium">ID</th>
+                                        <th class="p-2.5 text-left font-medium">Token</th>
+                                        <th class="p-2.5 text-left font-medium w-20"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(t, idx) in configTokens" :key="idx">
+                                        <tr class="border-t border-gray-100 dark:border-gray-700">
+                                            <td class="p-2"><input x-model="t.id" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"></td>
+                                            <td class="p-2"><input x-model="t.token" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"></td>
+                                            <td class="p-2"><button @click="removeToken(idx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove</button></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div x-show="configTokens.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">No tokens configured</div>
+                    </div>
+                </div>
+
+                <!-- App Settings (left list + right detail) -->
+                <div x-show="tab === 'app-settings'" x-cloak>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        <!-- Left: Settings List -->
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
+                            <h2 class="text-base font-bold mb-3">Settings</h2>
+                            <div class="space-y-1">
+                                <div class="cursor-pointer border rounded-lg px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium">Application</span>
+                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right: App Settings Detail -->
+                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                            <h2 class="text-lg font-bold mb-4">Application Settings</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Log Level</label>
+                                    <select x-model="configApp.level" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="debug">debug</option>
+                                        <option value="info">info</option>
+                                        <option value="warn">warn</option>
+                                        <option value="error">error</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Auth</label>
+                                    <label class="flex items-center gap-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm cursor-pointer h-[42px]">
+                                        <input x-model="configApp.auth" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                                        <span x-text="configApp.auth ? 'Enabled' : 'Disabled'"></span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Listen Address</label>
+                                    <input x-model="configApp.listen" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Port</label>
+                                    <input x-model="configApp.port" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Routes (left list + right detail) -->
+                <div x-show="tab === 'routes'" x-cloak>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+                        <!-- Left: Route List -->
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-3 gap-2">
+                                <h2 class="text-base font-bold">Routes</h2>
+                                <button @click="addRoute(); selectedRoute = ''" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
+                            </div>
+                            <input x-model="routeFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <div class="flex-1 overflow-auto space-y-1">
+                                <template x-for="(route, id) in filteredConfigRoutes()" :key="id">
+                                    <div @click="selectedRoute = id" :class="selectedRoute === id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-mono font-medium truncate" x-text="id"></span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded" :class="apiTypeBadgeClass(route.api_type)" x-text="route.api_type"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5" x-text="(route.targets || []).length + ' targets'"></div>
+                                    </div>
+                                </template>
+                                <div x-show="Object.keys(filteredConfigRoutes()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No routes</div>
+                            </div>
+                        </div>
+                        <!-- Right: Route Detail -->
+                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 overflow-auto">
+                            <div x-show="!selectedRoute || !configRoutes[selectedRoute]">
+                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a route from the list to edit</div>
+                            </div>
+                            <div x-show="selectedRoute && configRoutes[selectedRoute]">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <input :value="selectedRoute" @change="renameRoute(selectedRoute, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
+                                        <select x-model="configRoutes[selectedRoute].api_type" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="anthropic">anthropic</option>
+                                            <option value="openai">openai</option>
+                                            <option value="gemini">gemini</option>
+                                        </select>
+                                    </div>
+                                    <button @click="removeRoute(selectedRoute); selectedRoute = ''" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Route</button>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Target Groups</h3>
+                                        <button @click="addRouteTargetGroup(selectedRoute)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Target Group</button>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <template x-for="(target, tIdx) in configRoutes[selectedRoute].targets" :key="tIdx">
+                                            <div class="border dark:border-gray-700 rounded-lg p-4">
+                                                <div class="flex items-center gap-3 mb-3">
+                                                    <input x-model="target.name" type="text" placeholder="group name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-40">
+                                                    <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                                                        <input type="checkbox" x-model="target.enable" class="rounded border-gray-300 dark:border-gray-600">
+                                                        <span>Enable</span>
+                                                    </label>
+                                                    <button @click="removeRouteTargetGroup(selectedRoute, tIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove</button>
+                                                </div>
+                                                <div class="pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Model Mappings</span>
+                                                        <button @click="addRouteModel(selectedRoute, tIdx)" class="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-0.5 rounded transition">+ Mapping</button>
+                                                    </div>
+                                                    <template x-for="(m, mIdx) in target.models" :key="mIdx">
+                                                        <div class="flex items-center gap-2 mb-1.5">
+                                                            <input x-model="m.match_model" type="text" placeholder="match_model" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                            <select :value="m.provider" @change="m.provider = $event.target.value" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                                <option value="">-- provider --</option>
+                                                                <template x-if="m.provider && !enabledConfigProvidersForRoutes()[m.provider]">
+                                                                    <option :value="m.provider" x-text="m.provider + ' (disabled)'" disabled></option>
+                                                                </template>
+                                                                <template x-for="(p, pname) in enabledConfigProvidersForRoutes()" :key="pname">
+                                                                    <option :value="pname" x-text="pname"></option>
+                                                                </template>
+                                                            </select>
+                                                            <input :value="m.model_id" @change="m.model_id = $event.target.value" type="text" placeholder="model_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1">
+                                                            <select :value="m.api_name" @change="m.api_name = $event.target.value" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                                <option value="">-- api --</option>
+                                                                <template x-for="api in (configProviders[m.provider] || {}).apis || []" :key="api.name">
+                                                                    <option :value="api.name" x-text="api.name + ' (' + api.api_type + ')'"></option>
+                                                                </template>
+                                                            </select>
+                                                            <button @click="removeRouteModel(selectedRoute, tIdx, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-1 rounded transition">&times;</button>
+                                                        </div>
+                                                    </template>
+                                                    <div x-show="!target.models || target.models.length === 0" class="text-xs text-gray-400 dark:text-gray-500 py-1">No model mappings</div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <div x-show="!configRoutes[selectedRoute].targets || configRoutes[selectedRoute].targets.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-4">No target groups configured</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Providers (left list + right detail) -->
+                <div x-show="tab === 'providers'" x-cloak>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+                        <!-- Left: Provider List -->
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-3 gap-2">
+                                <h2 class="text-base font-bold">Providers</h2>
+                                <button @click="addProvider(); selectedProvider = ''" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
+                            </div>
+                            <input x-model="providerFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <select x-model="providerTypeFilter" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">All Types</option>
+                                <template x-for="t in providerTypes" :key="t">
+                                    <option :value="t" x-text="t"></option>
+                                </template>
+                            </select>
+                            <div class="flex-1 overflow-auto space-y-1">
+                                <template x-for="(provider, name) in filteredConfigProviders()" :key="name">
+                                    <div @click="selectedProvider = name" :class="selectedProvider === name ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-mono font-medium truncate" x-text="name"></span>
+                                            <span x-show="provider.enable" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                        </div>
+                                        <div x-show="provider.name" class="text-xs text-gray-400 dark:text-gray-500 truncate" x-text="provider.name"></div>
+                                    </div>
+                                </template>
+                                <div x-show="Object.keys(filteredConfigProviders()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No providers</div>
+                            </div>
+                        </div>
+                        <!-- Right: Provider Detail -->
+                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 overflow-auto">
+                            <div x-show="!selectedProvider || !configProviders[selectedProvider]">
+                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a provider from the list to edit</div>
+                            </div>
+                            <div x-show="selectedProvider && configProviders[selectedProvider]">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <input :value="selectedProvider" type="text" readonly class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48">
+                                        <input x-model="configProviders[selectedProvider].name" type="text" placeholder="Display name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48">
+                                        <label class="flex items-center gap-2 text-sm cursor-pointer border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 h-[42px]">
+                                            <input x-model="configProviders[selectedProvider].enable" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                                            <span class="text-gray-600 dark:text-gray-300 text-sm" x-text="configProviders[selectedProvider].enable ? 'Enabled' : 'Disabled'"></span>
+                                        </label>
+                                    </div>
+                                    <button @click="removeProvider(selectedProvider); selectedProvider = ''" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Provider</button>
+                                </div>
+                                <div class="space-y-6">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Models</h3>
+                                            <button @click="addProviderModel(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <template x-for="(m, mIdx) in configProviders[selectedProvider].models" :key="mIdx">
+                                                <div class="flex items-center gap-2">
+                                                    <input x-model="m.model_id" type="text" placeholder="model_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-80">
+                                                    <button @click="removeProviderModel(selectedProvider, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
+                                                </div>
+                                            </template>
+                                            <div x-show="!configProviders[selectedProvider].models || configProviders[selectedProvider].models.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No models configured</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">APIs</h3>
+                                            <button @click="addProviderAPI(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add API</button>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <template x-for="(api, aIdx) in configProviders[selectedProvider].apis" :key="aIdx">
+                                                <div class="flex items-center gap-2">
+                                                    <input x-model="api.name" type="text" placeholder="name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-24">
+                                                    <select x-model="api.api_type" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-28">
+                                                        <option value="openai">openai</option>
+                                                        <option value="anthropic">anthropic</option>
+                                                        <option value="gemini">gemini</option>
+                                                    </select>
+                                                    <input x-model="api.base_url" type="text" placeholder="Base URL" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-0">
+                                                    <input x-model="api.api_key" type="password" placeholder="API Key" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-48">
+                                                    <button @click="removeProviderAPI(selectedProvider, aIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
+                                                </div>
+                                            </template>
+                                            <div x-show="!configProviders[selectedProvider].apis || configProviders[selectedProvider].apis.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No APIs configured</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Proxy</h3>
+                                        <input x-model="configProviders[selectedProvider].proxy" type="text" placeholder="Proxy URL (optional)" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-lg">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LLM Logs -->
+                <div x-show="tab === 'llmlogs'" x-cloak>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                        <div class="flex flex-wrap items-center gap-3 mb-4">
+                            <h2 class="text-lg font-bold">LLM Logs</h2>
+                            <div class="flex items-center gap-2 ml-auto">
+                                <input x-model="llmDate" type="date" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                <select x-model="logStatusFilter" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="">All Status</option>
+                                    <option value="success">Success</option>
+                                    <option value="error">Error</option>
+                                </select>
+                                <button @click="loadLLMLogs()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition shadow-sm">Load</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='timestamp'; logSortDesc=!logSortDesc">Time <span x-show="logSortField==='timestamp'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                        <th class="p-2.5 text-left font-medium">Route</th>
+                                        <th class="p-2.5 text-left font-medium">Model</th>
+                                        <th class="p-2.5 text-left font-medium">Provider</th>
+                                        <th class="p-2.5 text-left font-medium">Target Model</th>
+                                        <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='status_code'; logSortDesc=!logSortDesc">Status <span x-show="logSortField==='status_code'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                        <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='duration_ms'; logSortDesc=!logSortDesc">Duration <span x-show="logSortField==='duration_ms'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                        <th class="p-2.5 text-left font-medium">Input</th>
+                                        <th class="p-2.5 text-left font-medium">Output</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="log in sortedLLMLogs()" :key="log.timestamp + log.route_id + log.model_id">
+                                        <tr class="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
+                                            <td class="p-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400" x-text="new Date(log.timestamp).toLocaleTimeString()"></td>
+                                            <td class="p-2.5"><code class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded" x-text="log.route_id"></code></td>
+                                            <td class="p-2.5"><span class="text-xs" x-text="log.model_id"></span></td>
+                                            <td class="p-2.5"><span class="text-xs font-medium" x-text="log.provider"></span></td>
+                                            <td class="p-2.5"><span class="text-xs text-gray-500 dark:text-gray-400" x-text="log.target_model || '-'"></span></td>
+                                            <td class="p-2.5">
+                                                <span x-show="log.status_code" class="text-xs px-2 py-0.5 rounded-full font-medium" :class="statusBadgeClass(log.status_code)" x-text="log.status_code"></span>
+                                                <span x-show="log.error" class="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 font-medium" title="Error">ERR</span>
+                                            </td>
+                                            <td class="p-2.5 whitespace-nowrap" x-text="formatDuration(log.duration_ms)"></td>
+                                            <td class="p-2.5 text-gray-500 dark:text-gray-400" x-text="formatTokens(log.input_tokens)"></td>
+                                            <td class="p-2.5 text-gray-500 dark:text-gray-400" x-text="formatTokens(log.output_tokens)"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div x-show="llmLogs.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-12 text-sm">No logs found for this date</div>
+                        <div class="mt-4 flex items-center justify-between">
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Total: <span x-text="llmTotal"></span> records</span>
+                            <div class="flex items-center gap-2">
+                                <button @click="llmOffset = Math.max(0, llmOffset - llmLimit); loadLLMLogs()" :disabled="llmOffset === 0" class="px-3 py-1.5 border dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition">Prev</button>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Page <span x-text="currentPage"></span> / <span x-text="logPages || 1"></span></span>
+                                <button @click="llmOffset += llmLimit; loadLLMLogs()" :disabled="llmOffset + llmLimit >= llmTotal" class="px-3 py-1.5 border dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- App Logs -->
+                <div x-show="tab === 'applogs'" x-cloak>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-bold">Application Logs</h2>
+                            <div class="flex items-center gap-2">
+                                <button @click="toggleAppLogAutoRefresh()" :class="appLogAutoRefresh ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="text-sm px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                                    <span x-show="appLogAutoRefresh" class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                                    <span x-text="appLogAutoRefresh ? 'Auto Refresh ON' : 'Auto Refresh OFF'"></span>
+                                </button>
+                                <button @click="loadAppLogs()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded-lg transition shadow-sm">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg p-4 overflow-auto text-xs leading-relaxed font-mono" style="max-height: 600px;">
+                            <template x-for="line in appLogs" :key="line">
+                                <div :class="logLevelColor(line)" class="py-0.5 break-all" x-text="line"></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test -->
+                <div x-show="tab === 'test'" x-cloak>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Test Tool
+                        </h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Route</label>
+                                <select x-model="testRouteId" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    <template x-for="(route, id) in routes" :key="id">
+                                        <option :value="id" x-text="id + ' (' + route.api_type + ')'"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Model</label>
+                                <input x-model="testModel" type="text" placeholder="model_id or pattern" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="flex flex-wrap gap-1 mt-1.5">
+                                    <template x-for="m in (routes[testRouteId] || routes[firstRouteId] || {}).models || []" :key="m.model_id">
+                                        <button @click="testModel = m.model_id" class="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300 transition" x-text="m.model_id"></button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                                <input x-model="testUseV1" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                                <span>Use /v1 prefix</span>
+                            </label>
+                            <span class="text-xs text-gray-400 dark:text-gray-500" x-text="testUseV1 ? '/llm/' + (testRouteId || firstRouteId) + '/v1/messages' : '/llm/' + (testRouteId || firstRouteId) + '/messages'"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Prompt</label>
+                            <textarea x-model="testPrompt" rows="4" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                        </div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <button @click="sendTest()" :disabled="testLoading" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                                <svg x-show="testLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                <span x-text="testLoading ? 'Sending...' : 'Send Test'"></span>
+                            </button>
+                            <span x-show="testError" x-text="testError" class="text-red-500 text-sm"></span>
+                        </div>
+                        <div x-show="testResult" class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border dark:border-gray-700">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">Response</div>
+                            <pre class="text-sm whitespace-pre-wrap break-all text-gray-800 dark:text-gray-200 font-mono leading-relaxed" x-text="testResult"></pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </template>
+    </div>
+
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+        Go Agents Proxy &middot; <span class="font-mono">v1.0</span>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
