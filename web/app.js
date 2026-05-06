@@ -142,6 +142,25 @@ function adminApp() {
                     }
                 }
             }
+            this.selectDefaultConfigItems();
+        },
+
+        selectDefaultConfigItems() {
+            const routeKeys = Object.keys(this.configRoutes || {});
+            if ((!this.selectedRoute || !this.configRoutes[this.selectedRoute]) && routeKeys.length > 0) {
+                this.selectedRoute = routeKeys[0];
+            }
+            if (routeKeys.length === 0) {
+                this.selectedRoute = '';
+            }
+
+            const providerKeys = Object.keys(this.configProviders || {});
+            if ((!this.selectedProvider || !this.configProviders[this.selectedProvider]) && providerKeys.length > 0) {
+                this.selectedProvider = providerKeys[0];
+            }
+            if (providerKeys.length === 0) {
+                this.selectedProvider = '';
+            }
         },
 
         buildConfigObject() {
@@ -202,11 +221,13 @@ function adminApp() {
         addRoute() {
             const id = 'new-route-' + Date.now();
             this.configRoutes = { ...this.configRoutes, [id]: { api_type: 'anthropic', targets: [] } };
+            this.selectedRoute = id;
         },
         removeRoute(id) {
             const copy = { ...this.configRoutes };
             delete copy[id];
             this.configRoutes = copy;
+            this.selectDefaultConfigItems();
         },
         renameRoute(oldId, newId) {
             newId = newId.trim();
@@ -248,11 +269,13 @@ function adminApp() {
         addProvider() {
             const id = 'new-provider-' + Date.now();
             this.configProviders = { ...this.configProviders, [id]: { name: '', enable: false, proxy: '', models: [], apis: [] } };
+            this.selectedProvider = id;
         },
         removeProvider(id) {
             const copy = { ...this.configProviders };
             delete copy[id];
             this.configProviders = copy;
+            this.selectDefaultConfigItems();
         },
         addProviderModel(providerId) {
             const p = this.configProviders[providerId];
@@ -485,6 +508,10 @@ function adminApp() {
                 if (typeof m === 'string') return m;
                 return m.model_id || m;
             });
+        },
+
+        providerApis(providerName) {
+            return (this.configProviders[providerName] || {}).apis || [];
         },
 
         apiTypeBadgeClass(type) {
