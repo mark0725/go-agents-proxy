@@ -296,7 +296,7 @@
                                                     <template x-for="(m, mIdx) in target.models" :key="mIdx">
                                                         <div class="flex items-center gap-2 mb-1.5">
                                                             <input x-model="m.match_model" type="text" placeholder="match_model" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-32">
-                                                            <select :value="m.provider" @change="m.provider = $event.target.value" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                            <select x-model="m.provider" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
                                                                 <option value="">-- provider --</option>
                                                                 <template x-if="m.provider && !enabledConfigProvidersForRoutes()[m.provider]">
                                                                     <option :value="m.provider" x-text="m.provider + ' (disabled)'" disabled></option>
@@ -306,7 +306,7 @@
                                                                 </template>
                                                             </select>
                                                             <input :value="m.model_id" @change="m.model_id = $event.target.value" type="text" placeholder="model_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1">
-                                                            <select :value="m.api_name" @change="m.api_name = $event.target.value" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                            <select x-model="m.api_name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
                                                                 <option value="">-- api --</option>
                                                                 <template x-for="api in (configProviders[m.provider] || {}).apis || []" :key="api.name">
                                                                     <option :value="api.name" x-text="api.name + ' (' + api.api_type + ')'"></option>
