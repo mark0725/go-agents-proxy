@@ -35,6 +35,7 @@ function adminApp() {
         sidebarOpen: false,
         selectedRoute: '',
         selectedProvider: '',
+        visibleApiKeys: {},
 
         // Config editing state
         configApp: { level: 'info', auth: true, listen: '0.0.0.0', port: '8082' },
