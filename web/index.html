@@ -275,22 +275,35 @@
                                             <button @click="addRouteTargetGroup(selectedRoute)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Target Group</button>
                                         </div>
                                         <div class="space-y-3">
-                                            <template x-for="(target, tIdx) in configRoutes[selectedRoute].targets" :key="tIdx">
-                                                <div class="border dark:border-gray-700 rounded-lg p-4">
+                                            <template x-for="(target, tIdx) in configRoutes[selectedRoute].targets" :key="target.__uiKey || (selectedRoute + ':target:' + tIdx)">
+                                                <div
+                                                    draggable="true"
+                                                    @dragstart="startRouteTargetDrag(selectedRoute, tIdx)"
+                                                    @dragenter.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
+                                                    @dragover.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
+                                                    @drop.prevent="dropRouteTargetGroup(selectedRoute, tIdx)"
+                                                    @dragend="clearRouteTargetDragState()"
+                                                    :class="dragOverRouteTargetIndex === tIdx ? 'ring-2 ring-blue-400 border-blue-300 dark:border-blue-700' : ''"
+                                                    class="border dark:border-gray-700 rounded-lg p-4 transition">
                                                     <div class="flex items-center gap-3 mb-3">
+                                                        <button type="button" draggable="true" @dragstart.stop="startRouteTargetDrag(selectedRoute, tIdx)" class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Drag to reorder">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h.01M8 15h.01M12 9h.01M12 15h.01M16 9h.01M16 15h.01"/></svg>
+                                                        </button>
+                                                        <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-8" x-text="'#' + (tIdx + 1)"></span>
                                                         <input x-model="target.name" type="text" placeholder="group name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-40">
                                                         <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
                                                             <input type="checkbox" x-model="target.enable" class="rounded border-gray-300 dark:border-gray-600">
                                                             <span>Enable</span>
                                                         </label>
-                                                        <button @click="removeRouteTargetGroup(selectedRoute, tIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove</button>
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">Priority higher when placed earlier</span>
+                                                        <button @click="removeRouteTargetGroup(selectedRoute, tIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition ml-auto">Remove</button>
                                                     </div>
                                                     <div class="pl-4 border-l-2 border-gray-200 dark:border-gray-600">
                                                         <div class="flex items-center justify-between mb-2">
                                                             <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Model Mappings</span>
                                                             <button @click="addRouteModel(selectedRoute, tIdx)" class="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-0.5 rounded transition">+ Mapping</button>
                                                         </div>
-                                                        <template x-for="(m, mIdx) in target.models" :key="mIdx">
+                                                        <template x-for="(m, mIdx) in target.models" :key="m.__uiKey || (selectedRoute + ':target:' + tIdx + ':model:' + mIdx)">
                                                             <div class="flex items-center gap-2 mb-1.5">
                                                                 <input x-model="m.match_model" type="text" placeholder="match_model" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-32">
                                                                 <select @change="m.provider = $event.target.value; syncRouteModelSelection(m)" x-init="$nextTick(() => { $el.value = m.provider || '' })" x-effect="$nextTick(() => { $el.value = m.provider || '' })" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">

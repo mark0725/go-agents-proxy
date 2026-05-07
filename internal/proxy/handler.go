@@ -78,15 +78,46 @@ func copyResponse(w http.ResponseWriter, resp *http.Response, body []byte) {
 	w.Write(body)
 }
 
+func sanitizeAnthropicMessages(messages []Message) []Message {
+	sanitized := make([]Message, 0, len(messages))
+	for _, msg := range messages {
+		cloned := msg
+		blocks, ok := msg.Content.([]interface{})
+		if !ok || msg.Role != "assistant" {
+			sanitized = append(sanitized, cloned)
+			continue
+		}
+
+		filtered := make([]interface{}, 0, len(blocks))
+		for _, block := range blocks {
+			blockMap, ok := block.(map[string]interface{})
+			if !ok {
+				filtered = append(filtered, block)
+				continue
+			}
+			blockType, _ := blockMap["type"].(string)
+			if blockType == "thinking" || blockType == "redacted_thinking" {
+				continue
+			}
+			filtered = append(filtered, block)
+		}
+		cloned.Content = filtered
+		sanitized = append(sanitized, cloned)
+	}
+	return sanitized
+}
+
 func marshalAnthropicMessagesRequest(req *MessagesRequest, modelID string) ([]byte, error) {
 	forwardReq := *req
 	forwardReq.Model = modelID
+	forwardReq.Messages = sanitizeAnthropicMessages(req.Messages)
 	return json.Marshal(&forwardReq)
 }
 
 func marshalAnthropicTokenCountRequest(req *TokenCountRequest, modelID string) ([]byte, error) {
 	forwardReq := *req
 	forwardReq.Model = modelID
+	forwardReq.Messages = sanitizeAnthropicMessages(req.Messages)
 	return json.Marshal(&forwardReq)
 }
 

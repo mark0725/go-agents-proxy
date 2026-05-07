@@ -1,5 +1,6 @@
 function adminApp() {
     return {
+        nextUIKey: 1,
         tab: 'routes',
         authenticated: false,
         apiKey: '',
@@ -38,6 +39,8 @@ function adminApp() {
         selectedProvider: '',
         selectedLogEntry: null,
         visibleApiKeys: {},
+        draggingRouteTargetIndex: null,
+        dragOverRouteTargetIndex: null,
 
         // Config editing state
         configApp: { level: 'info', auth: true, listen: '0.0.0.0', port: '8082' },
@@ -133,6 +136,7 @@ function adminApp() {
             this.configTokens = JSON.parse(JSON.stringify(data.tokens || []));
             this.configRoutes = JSON.parse(JSON.stringify(data.routes || {}));
             this.configProviders = JSON.parse(JSON.stringify(data.providers || {}));
+            this.ensureRouteEditorKeys();
             // Normalize routes: ensure api_name defaults to 'default' and target.enable defaults to true
             for (const route of Object.values(this.configRoutes)) {
                 if (!route.targets) continue;
@@ -164,6 +168,40 @@ function adminApp() {
             }).filter(Boolean).join(' | ');
         },
 
+        createUIKey() {
+            const key = 'ui-' + this.nextUIKey;
+            this.nextUIKey += 1;
+            return key;
+        },
+
+        ensureRouteEditorKeys() {
+            for (const route of Object.values(this.configRoutes || {})) {
+                if (!route.targets) continue;
+                for (const target of route.targets) {
+                    if (!target.__uiKey) target.__uiKey = this.createUIKey();
+                    if (!target.models) continue;
+                    for (const model of target.models) {
+                        if (!model.__uiKey) model.__uiKey = this.createUIKey();
+                    }
+                }
+            }
+        },
+
+        stripUIKeys(value) {
+            if (Array.isArray(value)) {
+                return value.map(item => this.stripUIKeys(item));
+            }
+            if (!value || typeof value !== 'object') {
+                return value;
+            }
+            const result = {};
+            for (const [key, item] of Object.entries(value)) {
+                if (key === '__uiKey') continue;
+                result[key] = this.stripUIKeys(item);
+            }
+            return result;
+        },
+
         selectDefaultConfigItems() {
             const routeKeys = Object.keys(this.configRoutes || {});
             if ((!this.selectedRoute || !this.configRoutes[this.selectedRoute]) && routeKeys.length > 0) {
@@ -187,7 +225,7 @@ function adminApp() {
                 app: { ...this.configApp },
                 users: JSON.parse(JSON.stringify(this.configUsers)),
                 tokens: JSON.parse(JSON.stringify(this.configTokens)),
-                routes: JSON.parse(JSON.stringify(this.configRoutes)),
+                routes: this.stripUIKeys(this.configRoutes),
                 providers: JSON.parse(JSON.stringify(this.configProviders))
             };
         },
@@ -266,17 +304,49 @@ function adminApp() {
             const route = this.configRoutes[routeId];
             if (!route) return;
             if (!route.targets) route.targets = [];
-            route.targets.push({ name: '', enable: true, models: [] });
+            route.targets.push({ __uiKey: this.createUIKey(), name: '', enable: true, models: [] });
+        },
+        startRouteTargetDrag(routeId, index) {
+            const route = this.configRoutes[routeId];
+            if (!route || !route.targets || index < 0 || index >= route.targets.length) return;
+            this.draggingRouteTargetIndex = index;
+            this.dragOverRouteTargetIndex = index;
+        },
+        setRouteTargetDragOver(routeId, index) {
+            const route = this.configRoutes[routeId];
+            if (!route || !route.targets || this.draggingRouteTargetIndex === null) return;
+            if (index < 0 || index >= route.targets.length) return;
+            this.dragOverRouteTargetIndex = index;
+        },
+        moveRouteTargetGroup(routeId, fromIndex, toIndex) {
+            const route = this.configRoutes[routeId];
+            if (!route || !route.targets) return;
+            if (fromIndex === toIndex) return;
+            if (fromIndex < 0 || toIndex < 0 || fromIndex >= route.targets.length || toIndex >= route.targets.length) return;
+            const [moved] = route.targets.splice(fromIndex, 1);
+            route.targets.splice(toIndex, 0, moved);
+        },
+        dropRouteTargetGroup(routeId, index) {
+            if (this.draggingRouteTargetIndex === null) return;
+            this.moveRouteTargetGroup(routeId, this.draggingRouteTargetIndex, index);
+            this.clearRouteTargetDragState();
+        },
+        clearRouteTargetDragState() {
+            this.draggingRouteTargetIndex = null;
+            this.dragOverRouteTargetIndex = null;
         },
         removeRouteTargetGroup(routeId, tIdx) {
             const route = this.configRoutes[routeId];
             if (route && route.targets) route.targets.splice(tIdx, 1);
+            if (this.draggingRouteTargetIndex === tIdx) {
+                this.clearRouteTargetDragState();
+            }
         },
         addRouteModel(routeId, targetIdx) {
             const route = this.configRoutes[routeId];
             if (!route || !route.targets || !route.targets[targetIdx]) return;
             if (!route.targets[targetIdx].models) route.targets[targetIdx].models = [];
-            route.targets[targetIdx].models.push({ match_model: '', provider: '', model_id: '', api_name: 'default' });
+            route.targets[targetIdx].models.push({ __uiKey: this.createUIKey(), match_model: '', provider: '', model_id: '', api_name: 'default' });
         },
         removeRouteModel(routeId, targetIdx, mIdx) {
             const route = this.configRoutes[routeId];
