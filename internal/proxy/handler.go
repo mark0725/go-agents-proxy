@@ -25,12 +25,9 @@ func NewHandler(cfg *config.Manager, log *logger.Logger) *Handler {
 	return &Handler{Config: cfg, Logger: log}
 }
 
-// validateAPIKey checks the request against configured tokens.
-func (h *Handler) validateAPIKey(r *http.Request) bool {
+// validateLLMAPIKey checks /llm requests against configured tokens only.
+func (h *Handler) validateLLMAPIKey(r *http.Request) bool {
 	cfg := h.Config.Get()
-	if !cfg.App.Auth {
-		return true
-	}
 	apiKey := r.Header.Get("x-api-key")
 	if apiKey == "" {
 		authHeader := r.Header.Get("Authorization")
@@ -39,11 +36,6 @@ func (h *Handler) validateAPIKey(r *http.Request) bool {
 		}
 	}
 
-	for _, u := range cfg.Users {
-		if u.Token == apiKey || u.Password == apiKey {
-			return true
-		}
-	}
 	for _, t := range cfg.Tokens {
 		if t.Token == apiKey {
 			return true
@@ -140,7 +132,7 @@ func truncateLogText(text string) string {
 
 // HandleMessages processes /llm/<route-id>/v1/messages.
 func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateLLMAPIKey(r) {
 		slog.Warn("authentication failed", slog.String("path", r.URL.Path), slog.String("remote_addr", r.RemoteAddr))
 		sendAuthError(w)
 		return
@@ -397,7 +389,7 @@ func (h *Handler) handleStreamingWithFailover(w http.ResponseWriter, r *http.Req
 
 // HandleCountTokens processes /llm/<route-id>/v1/messages/count_tokens.
 func (h *Handler) HandleCountTokens(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateLLMAPIKey(r) {
 		slog.Warn("authentication failed", slog.String("path", r.URL.Path), slog.String("remote_addr", r.RemoteAddr))
 		sendAuthError(w)
 		return

@@ -28,6 +28,7 @@ function adminApp() {
         testRouteId: '',
         testModel: '',
         testPrompt: 'Hello!',
+        testTokenId: '',
         testUseV1: true,
         testResult: '',
         testLoading: false,
@@ -144,6 +145,10 @@ function adminApp() {
                 }
             }
             this.selectDefaultConfigItems();
+            const tokenIds = this.availableTestTokenIds();
+            if (!tokenIds.includes(this.testTokenId)) {
+                this.testTokenId = tokenIds[0] || '';
+            }
         },
 
         formatValidationMessage(err) {
@@ -576,6 +581,14 @@ function adminApp() {
             return models;
         },
 
+        availableTestTokenIds() {
+            return (this.configTokens || []).map(t => t?.id).filter(Boolean);
+        },
+
+        selectedTestToken() {
+            return (this.configTokens || []).find(t => t?.id === this.testTokenId) || null;
+        },
+
         syncRouteModelSelection(mapping) {
             if (!mapping) return;
             const models = this.providerModels(mapping.provider);
@@ -679,8 +692,14 @@ function adminApp() {
             this.testLoading = true;
             const routeId = this.testRouteId || this.firstRouteId;
             const model = this.testModel || this.firstModelForRoute;
+            const selectedToken = this.selectedTestToken();
             if (!routeId || !model) {
                 this.testError = 'Please select a route and model';
+                this.testLoading = false;
+                return;
+            }
+            if (!selectedToken?.token) {
+                this.testError = 'Please select a token for /llm requests';
                 this.testLoading = false;
                 return;
             }
@@ -690,7 +709,7 @@ function adminApp() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-api-key': this.apiKey
+                        'x-api-key': selectedToken.token
                     },
                     body: JSON.stringify({
                         model: model,

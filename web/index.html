@@ -584,6 +584,15 @@
                                 </select>
                             </div>
                             <div>
+                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Token</label>
+                                <select x-model="testTokenId" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">-- select token --</option>
+                                    <template x-for="token in configTokens" :key="token.id">
+                                        <option :value="token.id" x-text="token.id"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
                                 <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Model</label>
                                 <input x-model="testModel" type="text" placeholder="match_model pattern" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500">
                                 <div class="flex flex-wrap gap-1 mt-1.5">

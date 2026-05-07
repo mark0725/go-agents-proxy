@@ -25,7 +25,7 @@ func NewHandler(cfg *config.Manager, log *logger.Logger) *Handler {
 	return &Handler{Config: cfg, Logger: log}
 }
 
-func (h *Handler) validateAPIKey(r *http.Request) bool {
+func (h *Handler) validateAdminAPIKey(r *http.Request) bool {
 	cfg := h.Config.Get()
 	if !cfg.App.Auth {
 		return true
@@ -40,11 +40,6 @@ func (h *Handler) validateAPIKey(r *http.Request) bool {
 
 	for _, u := range cfg.Users {
 		if u.Token == apiKey || u.Password == apiKey {
-			return true
-		}
-	}
-	for _, t := range cfg.Tokens {
-		if t.Token == apiKey {
 			return true
 		}
 	}
@@ -89,7 +84,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateAdminAPIKey(r) {
 		sendError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
@@ -127,7 +122,7 @@ func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLLMLogs(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateAdminAPIKey(r) {
 		sendError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
@@ -164,7 +159,7 @@ func (h *Handler) handleLLMLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleAppLogs(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateAdminAPIKey(r) {
 		sendError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
@@ -191,7 +186,7 @@ func (h *Handler) handleAppLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleRoutes(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateAdminAPIKey(r) {
 		sendError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
@@ -206,7 +201,7 @@ func (h *Handler) handleRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleProviders(w http.ResponseWriter, r *http.Request) {
-	if !h.validateAPIKey(r) {
+	if !h.validateAdminAPIKey(r) {
 		sendError(w, http.StatusUnauthorized, "Invalid API key")
 		return
 	}
