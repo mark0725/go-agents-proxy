@@ -39,6 +39,8 @@ The `route-id` is defined in `config.yaml` under `routes`. Each route has an `ap
 
 Open `http://localhost:8082/` in a browser to access the management dashboard.
 
+![admin ui](./docs/ui-1.png)
+
 ## Configuration (`config.yaml`)
 
 ```yaml

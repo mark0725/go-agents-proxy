@@ -39,6 +39,8 @@
 
 在浏览器中打开 `http://localhost:8082/` 即可访问管理面板。
 
+![admin ui](./docs/ui-1.png)
+
 ## 配置（`config.yaml`）
 
 ```yaml
