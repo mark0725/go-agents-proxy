@@ -35,6 +35,7 @@ function adminApp() {
         sidebarOpen: false,
         selectedRoute: '',
         selectedProvider: '',
+        selectedLogEntry: null,
         visibleApiKeys: {},
 
         // Config editing state
@@ -145,6 +146,19 @@ function adminApp() {
             this.selectDefaultConfigItems();
         },
 
+        formatValidationMessage(err) {
+            const details = err?.error?.details;
+            if (!Array.isArray(details) || details.length === 0) {
+                return err?.error?.message || 'Save failed';
+            }
+            return details.map(item => {
+                if (!item?.path && !item?.message) return '';
+                if (!item?.path) return item.message;
+                if (!item?.message) return item.path;
+                return item.path + ': ' + item.message;
+            }).filter(Boolean).join(' | ');
+        },
+
         selectDefaultConfigItems() {
             const routeKeys = Object.keys(this.configRoutes || {});
             if ((!this.selectedRoute || !this.configRoutes[this.selectedRoute]) && routeKeys.length > 0) {
@@ -186,13 +200,14 @@ function adminApp() {
                     body: JSON.stringify(bodyObj)
                 });
                 if (res.ok) {
-                    this.configMessage = 'Config saved successfully';
-                    this.configError = false;
                     await this.loadRoutes();
                     await this.loadProviders();
+                    await this.loadConfig();
+                    this.configMessage = 'Config saved successfully';
+                    this.configError = false;
                 } else {
                     const err = await res.json();
-                    this.configMessage = err.error?.message || 'Save failed';
+                    this.configMessage = this.formatValidationMessage(err);
                     this.configError = true;
                 }
             } catch (e) {
@@ -305,6 +320,7 @@ function adminApp() {
             const data = await res.json();
             this.llmLogs = data.logs || [];
             this.llmTotal = data.total || 0;
+            this.selectedLogEntry = this.llmLogs.length ? this.llmLogs[0] : null;
         },
 
         sortedLLMLogs() {
@@ -383,6 +399,21 @@ function adminApp() {
         formatTokens(n) {
             if (n === undefined || n === null) return '-';
             return n.toLocaleString();
+        },
+
+        shortLogText(text) {
+            if (!text) return '-';
+            const singleLine = String(text).replace(/\s+/g, ' ').trim();
+            if (singleLine.length <= 100) return singleLine;
+            return singleLine.slice(0, 100) + '…';
+        },
+
+        selectLog(log) {
+            this.selectedLogEntry = log || null;
+        },
+
+        get selectedLog() {
+            return this.selectedLogEntry;
         },
 
         enabledConfigProviderKeys() {
@@ -512,6 +543,49 @@ function adminApp() {
 
         providerApis(providerName) {
             return (this.configProviders[providerName] || {}).apis || [];
+        },
+
+        providerModels(providerName) {
+            return ((this.configProviders[providerName] || {}).models || [])
+                .map(m => typeof m === 'string' ? m : m.model_id)
+                .filter(Boolean);
+        },
+
+        providerModelOptions(providerName, selectedModelID) {
+            const models = this.providerModels(providerName);
+            const options = models.map(modelID => ({ value: modelID, label: modelID, missing: false }));
+            if (selectedModelID && !models.includes(selectedModelID)) {
+                options.unshift({ value: selectedModelID, label: selectedModelID + ' (...)', missing: true });
+            }
+            return options;
+        },
+
+        routeMatchModels(routeId) {
+            const route = this.routes[routeId] || this.routes[this.firstRouteId];
+            if (!route || !route.targets) return [];
+            const models = [];
+            for (const target of route.targets) {
+                if (!target.models) continue;
+                for (const model of target.models) {
+                    if (!model?.match_model) continue;
+                    if (!models.includes(model.match_model)) {
+                        models.push(model.match_model);
+                    }
+                }
+            }
+            return models;
+        },
+
+        syncRouteModelSelection(mapping) {
+            if (!mapping) return;
+            const models = this.providerModels(mapping.provider);
+            if (!models.length) {
+                mapping.model_id = '';
+                return;
+            }
+            if (!mapping.model_id || !models.includes(mapping.model_id)) {
+                mapping.model_id = models[0];
+            }
         },
 
         apiTypeBadgeClass(type) {

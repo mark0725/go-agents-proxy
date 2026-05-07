@@ -67,6 +67,18 @@ func sendError(w http.ResponseWriter, status int, message string) {
 	})
 }
 
+func sendValidationError(w http.ResponseWriter, errs []config.ValidationError) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": map[string]interface{}{
+			"type":    "validation_error",
+			"message": "Invalid configuration",
+			"details": errs,
+		},
+	})
+}
+
 // RegisterRoutes registers all /api/* handlers.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/config", h.handleConfig)
@@ -98,17 +110,12 @@ func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 			return
 		}
-		// Default RouteTarget.Enable to true when not specified.
-		for _, route := range newCfg.Routes {
-			for i := range route.Targets {
-				if route.Targets[i].Enable == nil {
-					t := true
-					route.Targets[i].Enable = &t
-				}
-			}
+		config.NormalizeConfig(&newCfg)
+		if errs := config.ValidateConfig(&newCfg); len(errs) > 0 {
+			sendValidationError(w, errs)
+			return
 		}
-		h.Config.Set(&newCfg)
-		if err := h.Config.Save(); err != nil {
+		if err := h.Config.SaveConfig(&newCfg); err != nil {
 			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save config: %v", err))
 			return
 		}

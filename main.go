@@ -56,11 +56,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set proxy URL from env if present
-	if proxyURL := os.Getenv("PROXY_URL"); proxyURL != "" {
-		proxy.SetProxyURL(proxyURL)
-	}
-
 	// Handlers
 	proxyHandler := proxy.NewHandler(cfgMgr, log)
 	apiHandler := api.NewHandler(cfgMgr, log)

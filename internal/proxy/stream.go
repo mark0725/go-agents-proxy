@@ -16,6 +16,14 @@ import (
 	"github.com/mark0725/go-agents-proxy/internal/logger"
 )
 
+type StreamResult struct {
+	StatusCode   int
+	InputTokens  int
+	OutputTokens int
+	StopReason   string
+	ResponseBody string
+}
+
 func generateMessageID() string {
 	return fmt.Sprintf("msg_%s", uuid.New().String()[:24])
 }
@@ -25,53 +33,13 @@ func generateToolID() string {
 }
 
 // HandleOpenAIStream converts an OpenAI-compatible SSE stream to Anthropic SSE events.
-func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq *MessagesRequest, openAIReq *OpenAIRequest, api config.APIConfig, proxyURL string, log *logger.Logger, routeID string) {
+func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq *MessagesRequest, openAIReq *OpenAIRequest, api config.APIConfig, proxyURL string, originalHeaders http.Header, log *logger.Logger, routeID string) (*StreamResult, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("streaming not supported")
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
-	messageID := generateMessageID()
-
-	// message_start
-	writeSSE(w, flusher, "message_start", map[string]interface{}{
-		"type": "message_start",
-		"message": map[string]interface{}{
-			"id":            messageID,
-			"type":          "message",
-			"role":          "assistant",
-			"model":         originalReq.Model,
-			"content":       []interface{}{},
-			"stop_reason":   nil,
-			"stop_sequence": nil,
-			"usage": map[string]int{
-				"input_tokens":                0,
-				"cache_creation_input_tokens": 0,
-				"cache_read_input_tokens":     0,
-				"output_tokens":               0,
-			},
-		},
-	})
-
-	// content_block_start for text
-	writeSSE(w, flusher, "content_block_start", map[string]interface{}{
-		"type":  "content_block_start",
-		"index": 0,
-		"content_block": map[string]interface{}{
-			"type": "text",
-			"text": "",
-		},
-	})
-
-	// ping
-	writeSSE(w, flusher, "ping", map[string]interface{}{"type": "ping"})
-
-	// Prepare request body
 	openAIReq.Stream = true
 	for i := range openAIReq.Messages {
 		if content, ok := openAIReq.Messages[i].Content.([]map[string]interface{}); ok {
@@ -105,25 +73,56 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 	jsonBody, err := json.Marshal(openAIReq)
 	if err != nil {
 		slog.Error("failed to marshal stream request", slog.String("error", err.Error()))
-		finalizeStream(w, flusher, 0, false, 0)
-		return
+		return nil, err
 	}
 
 	endpoint := api.BaseURL + "/chat/completions"
-	resp, err := CallProviderStream(ctx, api, jsonBody, proxyURL, endpoint)
+	resp, err := CallProviderStream(ctx, api, jsonBody, proxyURL, endpoint, originalHeaders)
 	if err != nil {
 		slog.Error("stream request failed", slog.String("error", err.Error()))
-		finalizeStream(w, flusher, 0, false, 0)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		err = fmt.Errorf("stream API error (status %d): %s", resp.StatusCode, string(body))
 		slog.Error("stream API error", slog.Int("status", resp.StatusCode), slog.String("body", string(body)))
-		finalizeStream(w, flusher, 0, false, 0)
-		return
+		return &StreamResult{StatusCode: resp.StatusCode, ResponseBody: formatLogBody(body)}, err
 	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	messageID := generateMessageID()
+	writeSSE(w, flusher, "message_start", map[string]interface{}{
+		"type": "message_start",
+		"message": map[string]interface{}{
+			"id":            messageID,
+			"type":          "message",
+			"role":          "assistant",
+			"model":         originalReq.Model,
+			"content":       []interface{}{},
+			"stop_reason":   nil,
+			"stop_sequence": nil,
+			"usage": map[string]int{
+				"input_tokens":                0,
+				"cache_creation_input_tokens": 0,
+				"cache_read_input_tokens":     0,
+				"output_tokens":               0,
+			},
+		},
+	})
+	writeSSE(w, flusher, "content_block_start", map[string]interface{}{
+		"type":  "content_block_start",
+		"index": 0,
+		"content_block": map[string]interface{}{
+			"type": "text",
+			"text": "",
+		},
+	})
+	writeSSE(w, flusher, "ping", map[string]interface{}{"type": "ping"})
 
 	scanner := bufio.NewScanner(resp.Body)
 	buf := make([]byte, 0, 64*1024)
@@ -133,8 +132,12 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 	toolIndex := -1
 	lastToolIndex := 0
 	textBlockClosed := false
+	inputTokens := 0
 	outputTokens := 0
 	hasSentStopReason := false
+	stopReason := ""
+	var responseText strings.Builder
+	toolUses := make([]map[string]interface{}, 0)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -153,16 +156,15 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 		}
 
 		mu.Lock()
-
 		if chunk.Usage != nil {
+			inputTokens = chunk.Usage.PromptTokens
 			outputTokens = chunk.Usage.CompletionTokens
 		}
-
 		if len(chunk.Choices) > 0 {
 			choice := chunk.Choices[0]
 			delta := choice.Delta
-
 			if delta.Content != "" && toolIndex < 0 && !textBlockClosed {
+				responseText.WriteString(delta.Content)
 				writeSSE(w, flusher, "content_block_delta", map[string]interface{}{
 					"type":  "content_block_delta",
 					"index": 0,
@@ -172,23 +174,19 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 					},
 				})
 			}
-
 			if len(delta.ToolCalls) > 0 {
-				if toolIndex < 0 {
-					if !textBlockClosed {
-						textBlockClosed = true
-						writeSSE(w, flusher, "content_block_stop", map[string]interface{}{
-							"type":  "content_block_stop",
-							"index": 0,
-						})
-					}
+				if toolIndex < 0 && !textBlockClosed {
+					textBlockClosed = true
+					writeSSE(w, flusher, "content_block_stop", map[string]interface{}{"type": "content_block_stop", "index": 0})
 				}
-
 				for _, toolCall := range delta.ToolCalls {
 					if toolCall.ID != "" {
 						lastToolIndex++
 						toolIndex = lastToolIndex
-
+						toolUses = append(toolUses, map[string]interface{}{
+							"id":   toolCall.ID,
+							"name": toolCall.Function.Name,
+						})
 						writeSSE(w, flusher, "content_block_start", map[string]interface{}{
 							"type":  "content_block_start",
 							"index": toolIndex,
@@ -200,8 +198,10 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 							},
 						})
 					}
-
 					if toolCall.Function.Arguments != "" {
+						if len(toolUses) > 0 {
+							toolUses[len(toolUses)-1]["arguments"] = toolCall.Function.Arguments
+						}
 						writeSSE(w, flusher, "content_block_delta", map[string]interface{}{
 							"type":  "content_block_delta",
 							"index": toolIndex,
@@ -213,43 +213,29 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 					}
 				}
 			}
-
 			if choice.FinishReason != nil && !hasSentStopReason {
 				hasSentStopReason = true
-
 				for i := 1; i <= lastToolIndex; i++ {
-					writeSSE(w, flusher, "content_block_stop", map[string]interface{}{
-						"type":  "content_block_stop",
-						"index": i,
-					})
+					writeSSE(w, flusher, "content_block_stop", map[string]interface{}{"type": "content_block_stop", "index": i})
 				}
-
 				if !textBlockClosed {
-					writeSSE(w, flusher, "content_block_stop", map[string]interface{}{
-						"type":  "content_block_stop",
-						"index": 0,
-					})
+					writeSSE(w, flusher, "content_block_stop", map[string]interface{}{"type": "content_block_stop", "index": 0})
 				}
-
-				stopReason := "end_turn"
+				stopReason = "end_turn"
 				switch *choice.FinishReason {
 				case "length":
 					stopReason = "max_tokens"
 				case "tool_calls":
 					stopReason = "tool_use"
 				}
-
 				writeSSE(w, flusher, "message_delta", map[string]interface{}{
 					"type": "message_delta",
 					"delta": map[string]interface{}{
 						"stop_reason":   stopReason,
 						"stop_sequence": nil,
 					},
-					"usage": map[string]int{
-						"output_tokens": outputTokens,
-					},
+					"usage": map[string]int{"output_tokens": outputTokens},
 				})
-
 				writeSSE(w, flusher, "message_stop", map[string]interface{}{"type": "message_stop"})
 				fmt.Fprintf(w, "data: [DONE]\n\n")
 				flusher.Flush()
@@ -260,34 +246,67 @@ func HandleOpenAIStream(ctx context.Context, w http.ResponseWriter, originalReq 
 
 	if err := scanner.Err(); err != nil {
 		slog.Error("stream read error", slog.String("error", err.Error()))
+		writeSSE(w, flusher, "error", map[string]interface{}{
+			"type":  "error",
+			"error": map[string]string{"type": "stream_error", "message": "Upstream stream failed"},
+		})
+		return &StreamResult{
+			StatusCode:   resp.StatusCode,
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			ResponseBody: marshalLogValue(map[string]interface{}{"text": responseText.String(), "tool_uses": toolUses}),
+		}, err
 	}
 
 	if !hasSentStopReason {
-		finalizeStream(w, flusher, lastToolIndex, textBlockClosed, outputTokens)
+		writeSSE(w, flusher, "error", map[string]interface{}{
+			"type":  "error",
+			"error": map[string]string{"type": "stream_error", "message": "Upstream stream ended without stop reason"},
+		})
+		return &StreamResult{
+			StatusCode:   resp.StatusCode,
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			ResponseBody: marshalLogValue(map[string]interface{}{"text": responseText.String(), "tool_uses": toolUses}),
+		}, fmt.Errorf("upstream stream ended without stop reason")
 	}
+
+	return &StreamResult{
+		StatusCode:   resp.StatusCode,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		StopReason:   stopReason,
+		ResponseBody: marshalLogValue(map[string]interface{}{"text": responseText.String(), "tool_uses": toolUses}),
+	}, nil
 }
 
 // HandleAnthropicStreamProxy pipes the Anthropic SSE stream directly to the client.
-func HandleAnthropicStreamProxy(ctx context.Context, w http.ResponseWriter, api config.APIConfig, proxyURL string, body []byte, suffix string) {
+func HandleAnthropicStreamProxy(ctx context.Context, w http.ResponseWriter, api config.APIConfig, proxyURL string, originalHeaders http.Header, body []byte, suffix string) (*StreamResult, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("streaming not supported")
 	}
 
 	endpoint := BuildEndpoint(api.BaseURL, suffix)
-	resp, err := CallProviderStream(ctx, api, body, proxyURL, endpoint)
+	resp, err := CallProviderStream(ctx, api, body, proxyURL, endpoint, originalHeaders)
 	if err != nil {
 		slog.Error("failed to call Anthropic API", slog.String("error", err.Error()))
 		http.Error(w, fmt.Sprintf("API error: %v", err), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		err = fmt.Errorf("anthropic stream API error (status %d): %s", resp.StatusCode, string(body))
+		http.Error(w, err.Error(), resp.StatusCode)
+		return &StreamResult{StatusCode: resp.StatusCode, ResponseBody: formatLogBody(body)}, err
+	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-
 	if reqID := resp.Header.Get("x-request-id"); reqID != "" {
 		w.Header().Set("x-request-id", reqID)
 	}
@@ -295,48 +314,57 @@ func HandleAnthropicStreamProxy(ctx context.Context, w http.ResponseWriter, api 
 	scanner := bufio.NewScanner(resp.Body)
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
-
+	result := &StreamResult{StatusCode: resp.StatusCode}
 	for scanner.Scan() {
 		line := scanner.Text()
 		slog.Debug("stream line", slog.String("line", line))
+		if strings.HasPrefix(line, "data: ") {
+			data := strings.TrimPrefix(line, "data: ")
+			if data != "[DONE]" {
+				var event struct {
+					Type    string `json:"type"`
+					Usage   *Usage `json:"usage,omitempty"`
+					Message *struct {
+						Usage *Usage `json:"usage,omitempty"`
+					} `json:"message,omitempty"`
+					Delta struct {
+						StopReason string `json:"stop_reason,omitempty"`
+					} `json:"delta,omitempty"`
+					Error map[string]string `json:"error,omitempty"`
+				}
+				if err := json.Unmarshal([]byte(data), &event); err == nil {
+					if event.Usage != nil {
+						result.InputTokens = event.Usage.InputTokens
+						result.OutputTokens = event.Usage.OutputTokens
+					}
+					if event.Message != nil && event.Message.Usage != nil {
+						if result.InputTokens == 0 {
+							result.InputTokens = event.Message.Usage.InputTokens
+						}
+						if result.OutputTokens == 0 {
+							result.OutputTokens = event.Message.Usage.OutputTokens
+						}
+					}
+					if event.Delta.StopReason != "" {
+						result.StopReason = event.Delta.StopReason
+					}
+					if len(event.Error) > 0 {
+						result.ResponseBody = marshalLogValue(event)
+					}
+				}
+			}
+		}
 		fmt.Fprintf(w, "%s\n", line)
 		flusher.Flush()
 	}
-
 	if err := scanner.Err(); err != nil {
 		slog.Error("failed to read stream", slog.String("error", err.Error()))
+		return result, err
 	}
-}
-
-func finalizeStream(w http.ResponseWriter, flusher http.Flusher, lastToolIndex int, textBlockClosed bool, outputTokens int) {
-	for i := 1; i <= lastToolIndex; i++ {
-		writeSSE(w, flusher, "content_block_stop", map[string]interface{}{
-			"type":  "content_block_stop",
-			"index": i,
-		})
+	if result.ResponseBody == "" {
+		result.ResponseBody = marshalLogValue(map[string]interface{}{"stop_reason": result.StopReason})
 	}
-
-	if !textBlockClosed {
-		writeSSE(w, flusher, "content_block_stop", map[string]interface{}{
-			"type":  "content_block_stop",
-			"index": 0,
-		})
-	}
-
-	writeSSE(w, flusher, "message_delta", map[string]interface{}{
-		"type": "message_delta",
-		"delta": map[string]interface{}{
-			"stop_reason":   "end_turn",
-			"stop_sequence": nil,
-		},
-		"usage": map[string]int{
-			"output_tokens": outputTokens,
-		},
-	})
-
-	writeSSE(w, flusher, "message_stop", map[string]interface{}{"type": "message_stop"})
-	fmt.Fprintf(w, "data: [DONE]\n\n")
-	flusher.Flush()
+	return result, nil
 }
 
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, data interface{}) {

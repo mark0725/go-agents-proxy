@@ -3,8 +3,10 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,6 +87,12 @@ type Config struct {
 	Providers map[string]ProviderConfig `yaml:"providers" json:"providers"`
 }
 
+// ValidationError represents a config validation failure.
+type ValidationError struct {
+	Path    string `json:"path"`
+	Message string `json:"message"`
+}
+
 // Manager holds the current config with thread-safe access.
 type Manager struct {
 	mu     sync.RWMutex
@@ -115,16 +123,175 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
-	// Default RouteTarget.Enable to true when not specified.
-	for _, route := range cfg.Routes {
+	NormalizeConfig(&cfg)
+	if errs := ValidateConfig(&cfg); len(errs) > 0 {
+		return nil, fmt.Errorf("validate config: %s", formatValidationErrors(errs))
+	}
+	return &cfg, nil
+}
+
+// NormalizeConfig applies default values and canonicalizes config shapes.
+func NormalizeConfig(cfg *Config) {
+	if cfg.Routes == nil {
+		cfg.Routes = map[string]Route{}
+	}
+	if cfg.Providers == nil {
+		cfg.Providers = map[string]ProviderConfig{}
+	}
+	for routeID, route := range cfg.Routes {
 		for i := range route.Targets {
 			if route.Targets[i].Enable == nil {
-				t := true
-				route.Targets[i].Enable = &t
+				enabled := true
+				route.Targets[i].Enable = &enabled
+			}
+		}
+		cfg.Routes[routeID] = route
+	}
+}
+
+// ValidateConfig validates the current config and returns field-level errors.
+func ValidateConfig(cfg *Config) []ValidationError {
+	var errs []ValidationError
+
+	for providerName, provider := range cfg.Providers {
+		providerPath := fmt.Sprintf("providers.%s", providerName)
+		if strings.TrimSpace(providerName) == "" {
+			errs = append(errs, ValidationError{Path: "providers", Message: "provider key cannot be empty"})
+		}
+		if strings.TrimSpace(provider.Proxy) != "" {
+			if err := validateURL(provider.Proxy); err != nil {
+				errs = append(errs, ValidationError{Path: providerPath + ".proxy", Message: err.Error()})
+			}
+		}
+		for i, model := range provider.Models {
+			if strings.TrimSpace(model.ModelID) == "" {
+				errs = append(errs, ValidationError{Path: fmt.Sprintf("%s.models[%d].model_id", providerPath, i), Message: "model_id cannot be empty"})
+			}
+		}
+		apiKeys := map[string]struct{}{}
+		for i, api := range provider.APIs {
+			apiPath := fmt.Sprintf("%s.apis[%d]", providerPath, i)
+			if strings.TrimSpace(api.Name) == "" {
+				errs = append(errs, ValidationError{Path: apiPath + ".name", Message: "api name cannot be empty"})
+			}
+			if !isValidAPIType(api.APIType) {
+				errs = append(errs, ValidationError{Path: apiPath + ".api_type", Message: "api_type must be one of anthropic, openai, gemini"})
+			}
+			apiKey := strings.TrimSpace(api.Name) + "\x00" + strings.ToLower(strings.TrimSpace(api.APIType))
+			if strings.TrimSpace(api.Name) != "" && strings.TrimSpace(api.APIType) != "" {
+				if _, exists := apiKeys[apiKey]; exists {
+					errs = append(errs, ValidationError{Path: apiPath, Message: "provider api name + api_type must be unique within provider"})
+				}
+				apiKeys[apiKey] = struct{}{}
+			}
+			if strings.TrimSpace(api.BaseURL) != "" {
+				if err := validateURL(api.BaseURL); err != nil {
+					errs = append(errs, ValidationError{Path: apiPath + ".base_url", Message: err.Error()})
+				}
 			}
 		}
 	}
-	return &cfg, nil
+
+	for routeID, route := range cfg.Routes {
+		routePath := fmt.Sprintf("routes.%s", routeID)
+		if strings.TrimSpace(routeID) == "" {
+			errs = append(errs, ValidationError{Path: "routes", Message: "route key cannot be empty"})
+		}
+		if !isValidAPIType(route.APIType) {
+			errs = append(errs, ValidationError{Path: routePath + ".api_type", Message: "api_type must be one of anthropic, openai, gemini"})
+		}
+		if len(route.Targets) == 0 {
+			errs = append(errs, ValidationError{Path: routePath + ".targets", Message: "route must have at least one target"})
+		}
+		for i, target := range route.Targets {
+			targetPath := fmt.Sprintf("%s.targets[%d]", routePath, i)
+			if len(target.Models) == 0 {
+				errs = append(errs, ValidationError{Path: targetPath + ".models", Message: "target must have at least one model mapping"})
+			}
+			for j, model := range target.Models {
+				modelPath := fmt.Sprintf("%s.models[%d]", targetPath, j)
+				if strings.TrimSpace(model.MatchModel) == "" {
+					errs = append(errs, ValidationError{Path: modelPath + ".match_model", Message: "match_model cannot be empty"})
+				}
+				providerName := strings.TrimSpace(model.Provider)
+				if providerName == "" {
+					errs = append(errs, ValidationError{Path: modelPath + ".provider", Message: "provider cannot be empty"})
+					continue
+				}
+				provider, ok := cfg.Providers[providerName]
+				if !ok {
+					errs = append(errs, ValidationError{Path: modelPath + ".provider", Message: "provider does not exist"})
+					continue
+				}
+				if strings.TrimSpace(model.ModelID) == "" {
+					errs = append(errs, ValidationError{Path: modelPath + ".model_id", Message: "model_id cannot be empty"})
+				} else if !providerHasModel(provider, model.ModelID) {
+					errs = append(errs, ValidationError{Path: modelPath + ".model_id", Message: "model_id must exist in the selected provider models"})
+				}
+				if apiName := strings.TrimSpace(model.APIName); apiName != "" && !providerHasAPI(provider, apiName) {
+					errs = append(errs, ValidationError{Path: modelPath + ".api_name", Message: "api_name must exist in the selected provider"})
+				}
+				if len(provider.APIs) == 0 {
+					errs = append(errs, ValidationError{Path: "providers." + providerName + ".apis", Message: "provider must define at least one api"})
+				}
+			}
+		}
+	}
+
+	return errs
+}
+
+func providerHasModel(provider ProviderConfig, modelID string) bool {
+	for _, model := range provider.Models {
+		if model.ModelID == modelID {
+			return true
+		}
+	}
+	return false
+}
+
+func providerHasAPI(provider ProviderConfig, apiName string) bool {
+	for _, api := range provider.APIs {
+		if api.Name == apiName {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidAPIType(apiType string) bool {
+	switch strings.ToLower(strings.TrimSpace(apiType)) {
+	case "anthropic", "openai", "gemini":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("url cannot be empty")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid url: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("url must use http or https")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("url host cannot be empty")
+	}
+	return nil
+}
+
+func formatValidationErrors(errs []ValidationError) string {
+	parts := make([]string, 0, len(errs))
+	for _, err := range errs {
+		parts = append(parts, fmt.Sprintf("%s: %s", err.Path, err.Message))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // Get returns the current config (read-only; copy if mutation needed).
@@ -146,11 +313,38 @@ func (m *Manager) Save() error {
 	m.mu.RLock()
 	cfg := m.config
 	m.mu.RUnlock()
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+	NormalizeConfig(cfg)
+	if errs := ValidateConfig(cfg); len(errs) > 0 {
+		return fmt.Errorf("validate config: %s", formatValidationErrors(errs))
+	}
+	return m.writeConfig(cfg)
+}
+
+// SaveConfig validates, writes, and activates the given config.
+func (m *Manager) SaveConfig(cfg *Config) error {
+	NormalizeConfig(cfg)
+	if errs := ValidateConfig(cfg); len(errs) > 0 {
+		return fmt.Errorf("validate config: %s", formatValidationErrors(errs))
+	}
+	if err := m.writeConfig(cfg); err != nil {
+		return err
+	}
+	m.Set(cfg)
+	return nil
+}
+
+func (m *Manager) writeConfig(cfg *Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	return os.WriteFile(m.path, data, 0644)
+	if err := os.WriteFile(m.path, data, 0644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	return nil
 }
 
 // Watch starts a filesystem watcher that reloads config on change.
@@ -171,7 +365,6 @@ func (m *Manager) Watch() error {
 					return
 				}
 				if event.Has(fsnotify.Write) || event.Has(fsnotify.Rename) {
-					// On rename (vim save pattern), re-add the file.
 					if event.Has(fsnotify.Rename) {
 						_ = watcher.Add(m.path)
 					}

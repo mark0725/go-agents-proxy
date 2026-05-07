@@ -50,8 +50,8 @@ type Tool struct {
 }
 
 type ThinkingConfig struct {
-	Enabled      bool `json:"enabled"`
-	BudgetTokens int  `json:"budget_tokens,omitempty"`
+	Type         string `json:"type"`
+	BudgetTokens int    `json:"budget_tokens,omitempty"`
 }
 
 type MessagesRequest struct {

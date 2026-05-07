@@ -1,12 +1,12 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -75,6 +75,29 @@ func sendError(w http.ResponseWriter, status int, message string) {
 	})
 }
 
+func copyResponse(w http.ResponseWriter, resp *http.Response, body []byte) {
+	for key, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	w.Write(body)
+}
+
+func marshalAnthropicMessagesRequest(req *MessagesRequest, modelID string) ([]byte, error) {
+	forwardReq := *req
+	forwardReq.Model = modelID
+	return json.Marshal(&forwardReq)
+}
+
+func marshalAnthropicTokenCountRequest(req *TokenCountRequest, modelID string) ([]byte, error) {
+	forwardReq := *req
+	forwardReq.Model = modelID
+	return json.Marshal(&forwardReq)
+}
+
 func extractRouteID(path string) string {
 	// path is /llm/<route-id>/v1/messages or /llm/<route-id>/v1/messages/count_tokens
 	parts := strings.Split(path, "/")
@@ -82,6 +105,37 @@ func extractRouteID(path string) string {
 		return parts[2]
 	}
 	return ""
+}
+
+func formatLogBody(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, body, "", "  "); err == nil {
+		return truncateLogText(pretty.String())
+	}
+	return truncateLogText(string(body))
+}
+
+func marshalLogValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	body, err := json.Marshal(v)
+	if err != nil {
+		return truncateLogText(fmt.Sprintf("%v", v))
+	}
+	return formatLogBody(body)
+}
+
+func truncateLogText(text string) string {
+	const maxLen = 8000
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen] + "\n... (truncated)"
 }
 
 // HandleMessages processes /llm/<route-id>/v1/messages.
@@ -133,7 +187,6 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.Request, req *MessagesRequest, body []byte, routeID string, targets []ResolvedTarget) {
 	var lastErr error
 	var lastStatus int
-	// Extract the path suffix after /llm/<route-id> (e.g. "/v1/messages")
 	suffix := strings.TrimPrefix(r.URL.Path, "/llm/"+routeID)
 
 	for _, target := range targets {
@@ -144,12 +197,17 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 			ModelID:     req.Model,
 			Provider:    target.Provider,
 			TargetModel: target.ModelID,
+			RequestBody: marshalLogValue(req),
 		}
 
 		if target.APIType == "anthropic" {
-			// Direct proxy for Anthropic: pass through the request path suffix.
+			jsonBody, err := marshalAnthropicMessagesRequest(req, target.ModelID)
+			if err != nil {
+				sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to marshal request: %v", err))
+				return
+			}
 			endpoint := BuildEndpoint(target.API.BaseURL, suffix)
-			resp, err := CallProvider(r.Context(), target.API, body, target.Proxy, endpoint)
+			resp, err := CallProvider(r.Context(), target.API, jsonBody, target.Proxy, endpoint, r.Header)
 			if err != nil {
 				lastErr = err
 				record.Error = err.Error()
@@ -170,26 +228,28 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 				lastErr = fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 				lastStatus = resp.StatusCode
 				record.Error = lastErr.Error()
+				record.ResponseBody = formatLogBody(respBody)
 				h.Logger.LogLLMCall(record)
 				if !IsRetryableError(nil, resp.StatusCode) {
 					break
 				}
 				continue
 			}
-			// Copy response headers
-			for key, values := range resp.Header {
-				for _, value := range values {
-					w.Header().Add(key, value)
+
+			var anthropicResp MessagesResponse
+			if err := json.Unmarshal(respBody, &anthropicResp); err == nil {
+				record.InputTokens = anthropicResp.Usage.InputTokens
+				record.OutputTokens = anthropicResp.Usage.OutputTokens
+				if anthropicResp.StopReason != nil {
+					record.StopReason = *anthropicResp.StopReason
 				}
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(respBody)
+			record.ResponseBody = formatLogBody(respBody)
+			copyResponse(w, resp, respBody)
 			h.Logger.LogLLMCall(record)
 			return
 		}
 
-		// Convert Anthropic -> OpenAI
 		openAIReq, err := ConvertAnthropicToOpenAI(req, Provider(target.APIType))
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to convert request: %v", err))
@@ -204,7 +264,7 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 		}
 
 		endpoint := target.API.BaseURL + "/chat/completions"
-		resp, err := CallProvider(r.Context(), target.API, jsonBody, target.Proxy, endpoint)
+		resp, err := CallProvider(r.Context(), target.API, jsonBody, target.Proxy, endpoint, r.Header)
 		if err != nil {
 			lastErr = err
 			record.Error = err.Error()
@@ -225,6 +285,7 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 			lastErr = fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 			lastStatus = resp.StatusCode
 			record.Error = lastErr.Error()
+			record.ResponseBody = formatLogBody(respBody)
 			h.Logger.LogLLMCall(record)
 			if !IsRetryableError(nil, resp.StatusCode) {
 				break
@@ -243,6 +304,10 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 		anthropicResp := ConvertOpenAIToAnthropic(&openAIResp, req, Provider(target.APIType))
 		record.InputTokens = anthropicResp.Usage.InputTokens
 		record.OutputTokens = anthropicResp.Usage.OutputTokens
+		if anthropicResp.StopReason != nil {
+			record.StopReason = *anthropicResp.StopReason
+		}
+		record.ResponseBody = marshalLogValue(anthropicResp)
 		h.Logger.LogLLMCall(record)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -250,7 +315,6 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// All targets failed
 	if lastStatus > 0 {
 		sendError(w, lastStatus, lastErr.Error())
 	} else {
@@ -259,9 +323,6 @@ func (h *Handler) handleNonStreamingWithFailover(w http.ResponseWriter, r *http.
 }
 
 func (h *Handler) handleStreamingWithFailover(w http.ResponseWriter, r *http.Request, req *MessagesRequest, body []byte, routeID string, targets []ResolvedTarget) {
-	// For streaming, we cannot retry after starting to write the response.
-	// We try the first target; on failure we cannot fall back.
-	// A future improvement could do a lightweight health check before choosing.
 	if len(targets) == 0 {
 		sendError(w, http.StatusInternalServerError, "No targets available")
 		return
@@ -275,16 +336,32 @@ func (h *Handler) handleStreamingWithFailover(w http.ResponseWriter, r *http.Req
 		ModelID:     req.Model,
 		Provider:    target.Provider,
 		TargetModel: target.ModelID,
+		RequestBody: marshalLogValue(req),
 	}
 	suffix := strings.TrimPrefix(r.URL.Path, "/llm/"+routeID)
 
 	if target.APIType == "anthropic" {
+		jsonBody, err := marshalAnthropicMessagesRequest(req, target.ModelID)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to marshal request: %v", err))
+			return
+		}
 		slog.Info("stream request",
 			slog.String("route", routeID),
 			slog.String("model", req.Model),
 			slog.String("provider", target.Provider),
 		)
-		HandleAnthropicStreamProxy(r.Context(), w, target.API, target.Proxy, body, suffix)
+		streamResult, err := HandleAnthropicStreamProxy(r.Context(), w, target.API, target.Proxy, r.Header, jsonBody, suffix)
+		if err != nil {
+			record.Error = err.Error()
+		}
+		if streamResult != nil {
+			record.StatusCode = streamResult.StatusCode
+			record.InputTokens = streamResult.InputTokens
+			record.OutputTokens = streamResult.OutputTokens
+			record.StopReason = streamResult.StopReason
+			record.ResponseBody = streamResult.ResponseBody
+		}
 		record.DurationMs = time.Since(start).Milliseconds()
 		h.Logger.LogLLMCall(record)
 		return
@@ -303,7 +380,17 @@ func (h *Handler) handleStreamingWithFailover(w http.ResponseWriter, r *http.Req
 		slog.String("provider", target.Provider),
 	)
 
-	HandleOpenAIStream(r.Context(), w, req, openAIReq, target.API, target.Proxy, h.Logger, routeID)
+	streamResult, err := HandleOpenAIStream(r.Context(), w, req, openAIReq, target.API, target.Proxy, r.Header, h.Logger, routeID)
+	if err != nil {
+		record.Error = err.Error()
+	}
+	if streamResult != nil {
+		record.StatusCode = streamResult.StatusCode
+		record.InputTokens = streamResult.InputTokens
+		record.OutputTokens = streamResult.OutputTokens
+		record.StopReason = streamResult.StopReason
+		record.ResponseBody = streamResult.ResponseBody
+	}
 	record.DurationMs = time.Since(start).Milliseconds()
 	h.Logger.LogLLMCall(record)
 }
@@ -347,49 +434,33 @@ func (h *Handler) HandleCountTokens(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if route.APIType == "anthropic" {
-		// Proxy to Anthropic count_tokens
 		targets, err := ResolveTargets(cfg, routeID, req.Model)
 		if err != nil || len(targets) == 0 {
 			sendError(w, http.StatusNotFound, "No targets available")
 			return
 		}
 		target := targets[0]
+		jsonBody, err := marshalAnthropicTokenCountRequest(&req, target.ModelID)
+		if err != nil {
+			sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to marshal request: %v", err))
+			return
+		}
 		suffix := strings.TrimPrefix(r.URL.Path, "/llm/"+routeID)
-			endpoint := BuildEndpoint(target.API.BaseURL, suffix)
-		httpReq, err := http.NewRequestWithContext(r.Context(), "POST", endpoint, strings.NewReader(string(body)))
+		endpoint := BuildEndpoint(target.API.BaseURL, suffix)
+		resp, err := CallProvider(r.Context(), target.API, jsonBody, target.Proxy, endpoint, r.Header)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("x-api-key", target.API.APIKey)
-		httpReq.Header.Set("anthropic-version", "2023-06-01")
-		var resp *http.Response
-		if target.Proxy != "" {
-			client := &http.Client{
-				Transport: &http.Transport{
-					Proxy: func(*http.Request) (*url.URL, error) {
-						return url.Parse(target.Proxy)
-					},
-				},
-			}
-			resp, err = client.Do(httpReq)
-		} else {
-			resp, err = sharedHTTPClient.Do(httpReq)
-		}
+		respBody, err := ReadResponseBody(resp)
 		if err != nil {
 			sendError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		defer resp.Body.Close()
-		respBody, _ := io.ReadAll(resp.Body)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		w.Write(respBody)
+		copyResponse(w, resp, respBody)
 		return
 	}
 
-	// Rough estimate for OpenAI/Google
 	totalChars := 0
 	for _, msg := range req.Messages {
 		if content, ok := msg.Content.(string); ok {
