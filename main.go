@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/mark0725/go-agents-proxy/internal/api"
@@ -63,14 +62,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// LLM routes
-	mux.HandleFunc("/llm/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasSuffix(path, "/count_tokens") {
-			proxyHandler.HandleCountTokens(w, r)
-		} else {
-			proxyHandler.HandleMessages(w, r)
-		}
-	})
+	mux.HandleFunc("/llm/", proxyHandler.HandleLLM)
 
 	// Management API
 	apiHandler.RegisterRoutes(mux)

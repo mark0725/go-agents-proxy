@@ -116,6 +116,7 @@ type OpenAIMessage struct {
 type OpenAIToolCall struct {
 	ID       string             `json:"id"`
 	Type     string             `json:"type"`
+	Index    *int               `json:"index,omitempty"`
 	Function OpenAIFunctionCall `json:"function"`
 }
 
@@ -325,65 +326,13 @@ func ConvertAnthropicToOpenAI(req *MessagesRequest, provider Provider) (*OpenAIR
 		switch content := msg.Content.(type) {
 		case string:
 			messages = append(messages, OpenAIMessage{Role: msg.Role, Content: content})
-
 		case []interface{}:
-			hasToolResult := false
-			for _, block := range content {
-				if blockMap, ok := block.(map[string]interface{}); ok {
-					if blockMap["type"] == "tool_result" {
-						hasToolResult = true
-						break
-					}
-				}
+			textContent, toolCalls := convertAnthropicBlocksToOpenAIMessage(content)
+			openAIMessage := OpenAIMessage{Role: msg.Role, Content: textContent}
+			if msg.Role == "assistant" && len(toolCalls) > 0 {
+				openAIMessage.ToolCalls = toolCalls
 			}
-
-			if msg.Role == "user" && hasToolResult {
-				var textContent strings.Builder
-				for _, block := range content {
-					if blockMap, ok := block.(map[string]interface{}); ok {
-						switch blockMap["type"] {
-						case "text":
-							if text, ok := blockMap["text"].(string); ok {
-								textContent.WriteString(text + "\n")
-							}
-						case "tool_result":
-							toolID := ""
-							if id, ok := blockMap["tool_use_id"].(string); ok {
-								toolID = id
-							}
-							resultContent := parseToolResultContent(blockMap["content"])
-							textContent.WriteString(fmt.Sprintf("Tool result for %s:\n%s\n", toolID, resultContent))
-						}
-					}
-				}
-				messages = append(messages, OpenAIMessage{Role: "user", Content: strings.TrimSpace(textContent.String())})
-			} else {
-				var processedContent []map[string]interface{}
-				for _, block := range content {
-					if blockMap, ok := block.(map[string]interface{}); ok {
-						switch blockMap["type"] {
-						case "text":
-							processedContent = append(processedContent, map[string]interface{}{
-								"type": "text",
-								"text": blockMap["text"],
-							})
-						case "image":
-							processedContent = append(processedContent, map[string]interface{}{
-								"type":   "image",
-								"source": blockMap["source"],
-							})
-						case "tool_use":
-							processedContent = append(processedContent, map[string]interface{}{
-								"type":  "tool_use",
-								"id":    blockMap["id"],
-								"name":  blockMap["name"],
-								"input": blockMap["input"],
-							})
-						}
-					}
-				}
-				messages = append(messages, OpenAIMessage{Role: msg.Role, Content: processedContent})
-			}
+			messages = append(messages, openAIMessage)
 		}
 	}
 
@@ -435,7 +384,7 @@ func ConvertAnthropicToOpenAI(req *MessagesRequest, provider Provider) (*OpenAIR
 		case "auto":
 			openAIReq.ToolChoice = "auto"
 		case "any":
-			openAIReq.ToolChoice = "any"
+			openAIReq.ToolChoice = "required"
 		case "tool":
 			if name, ok := req.ToolChoice["name"].(string); ok {
 				openAIReq.ToolChoice = map[string]interface{}{
@@ -467,42 +416,19 @@ func ConvertOpenAIToAnthropic(openAIResp *OpenAIResponse, originalReq *MessagesR
 			})
 		}
 
-		isAnthropicProvider := provider == ProviderAnthropic
-
-		if len(message.ToolCalls) > 0 && isAnthropicProvider {
-			for _, toolCall := range message.ToolCalls {
-				var args map[string]interface{}
-				json.Unmarshal([]byte(toolCall.Function.Arguments), &args)
-				if args == nil {
-					args = map[string]interface{}{"raw": toolCall.Function.Arguments}
-				}
-
-				content = append(content, map[string]interface{}{
-					"type":  "tool_use",
-					"id":    toolCall.ID,
-					"name":  toolCall.Function.Name,
-					"input": args,
-				})
-			}
-		} else if len(message.ToolCalls) > 0 && !isAnthropicProvider {
-			var toolText strings.Builder
-			toolText.WriteString("\n\nTool usage:\n")
-			for _, toolCall := range message.ToolCalls {
-				toolText.WriteString(fmt.Sprintf("Tool: %s\nArguments: %s\n\n", toolCall.Function.Name, toolCall.Function.Arguments))
+		for _, toolCall := range message.ToolCalls {
+			var args map[string]interface{}
+			_ = json.Unmarshal([]byte(toolCall.Function.Arguments), &args)
+			if args == nil {
+				args = map[string]interface{}{"raw": toolCall.Function.Arguments}
 			}
 
-			if len(content) > 0 {
-				if textBlock, ok := content[0].(map[string]interface{}); ok {
-					if textBlock["type"] == "text" {
-						textBlock["text"] = textBlock["text"].(string) + toolText.String()
-					}
-				}
-			} else {
-				content = append(content, map[string]interface{}{
-					"type": "text",
-					"text": toolText.String(),
-				})
-			}
+			content = append(content, map[string]interface{}{
+				"type":  "tool_use",
+				"id":    toolCall.ID,
+				"name":  toolCall.Function.Name,
+				"input": args,
+			})
 		}
 	}
 
@@ -542,4 +468,57 @@ func ConvertOpenAIToAnthropic(openAIResp *OpenAIResponse, originalReq *MessagesR
 			OutputTokens: openAIResp.Usage.CompletionTokens,
 		},
 	}
+}
+
+func convertAnthropicBlocksToOpenAIMessage(content []interface{}) (string, []OpenAIToolCall) {
+	var textContent strings.Builder
+	toolCalls := make([]OpenAIToolCall, 0)
+
+	for _, block := range content {
+		blockMap, ok := block.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		switch blockMap["type"] {
+		case "text":
+			if text, ok := blockMap["text"].(string); ok && text != "" {
+				if textContent.Len() > 0 {
+					textContent.WriteString("\n")
+				}
+				textContent.WriteString(text)
+			}
+		case "tool_result":
+			toolID, _ := blockMap["tool_use_id"].(string)
+			resultContent := parseToolResultContent(blockMap["content"])
+			if textContent.Len() > 0 {
+				textContent.WriteString("\n")
+			}
+			if toolID != "" {
+				textContent.WriteString(fmt.Sprintf("Tool result for %s:\n%s", toolID, resultContent))
+			} else {
+				textContent.WriteString(resultContent)
+			}
+		case "tool_use":
+			if name, ok := blockMap["name"].(string); ok && name != "" {
+				arguments, _ := json.Marshal(blockMap["input"])
+				toolCallID, _ := blockMap["id"].(string)
+				if toolCallID == "" {
+					toolCallID = generateToolID()
+				}
+				toolCalls = append(toolCalls, OpenAIToolCall{
+					ID:   toolCallID,
+					Type: "function",
+					Function: OpenAIFunctionCall{
+						Name:      name,
+						Arguments: string(arguments),
+					},
+				})
+			}
+		}
+	}
+
+	if textContent.Len() == 0 {
+		return "", toolCalls
+	}
+	return textContent.String(), toolCalls
 }

@@ -450,32 +450,35 @@
                             <div class="flex flex-wrap items-center gap-3 mb-4">
                                 <h2 class="text-lg font-bold">LLM Logs</h2>
                                 <div class="flex items-center gap-2 ml-auto">
-                                    <input x-model="llmDate" type="date" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <select x-model="logStatusFilter" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <input x-model="llmDate" @change="reloadLLMLogsFromFirstPage()" type="date" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <select x-model="logStatusFilter" @change="reloadLLMLogsFromFirstPage()" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="">All Status</option>
                                         <option value="success">Success</option>
                                         <option value="error">Error</option>
                                     </select>
-                                    <button @click="loadLLMLogs()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition shadow-sm">Load</button>
+                                    <button @click="loadLLMLogs()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition shadow-sm">Reload</button>
                                 </div>
+                            </div>
+                            <div x-show="llmTruncated" class="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
+                                Showing the most recent 50,000 records for this date. Earlier entries are not visible.
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm">
                                     <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 text-xs uppercase">
                                         <tr>
-                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='timestamp'; logSortDesc=!logSortDesc">Time <span x-show="logSortField==='timestamp'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="toggleLLMLogSort('timestamp')">Time <span x-show="logSortField==='timestamp'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
                                             <th class="p-2.5 text-left font-medium">Route</th>
                                             <th class="p-2.5 text-left font-medium">Model</th>
                                             <th class="p-2.5 text-left font-medium">Provider</th>
                                             <th class="p-2.5 text-left font-medium">Target Model</th>
-                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='status_code'; logSortDesc=!logSortDesc">Status <span x-show="logSortField==='status_code'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
-                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="logSortField='duration_ms'; logSortDesc=!logSortDesc">Duration <span x-show="logSortField==='duration_ms'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
-                                            <th class="p-2.5 text-left font-medium">Input</th>
-                                            <th class="p-2.5 text-left font-medium">Output</th>
+                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="toggleLLMLogSort('status_code')">Status <span x-show="logSortField==='status_code'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="toggleLLMLogSort('duration_ms')">Duration <span x-show="logSortField==='duration_ms'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="toggleLLMLogSort('input_tokens')">Input <span x-show="logSortField==='input_tokens'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
+                                            <th class="p-2.5 text-left font-medium cursor-pointer hover:text-blue-600" @click="toggleLLMLogSort('output_tokens')">Output <span x-show="logSortField==='output_tokens'" x-text="logSortDesc?'&#9660;':'&#9650;'"></span></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <template x-for="(log, index) in sortedLLMLogs()" :key="log.timestamp + log.route_id + log.model_id + index">
+                                        <template x-for="(log, index) in llmLogs" :key="log.timestamp + log.route_id + log.model_id + index">
                                             <tr @click="selectLog(log)" :class="selectedLog === log ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'" class="border-t border-gray-100 dark:border-gray-700 transition cursor-pointer">
                                                 <td class="p-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400" x-text="new Date(log.timestamp).toLocaleTimeString()"></td>
                                                 <td class="p-2.5"><code class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded" x-text="log.route_id"></code></td>

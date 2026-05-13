@@ -19,19 +19,20 @@ import (
 var sharedHTTPClient = newHTTPClient("")
 
 var excludedForwardHeaders = map[string]struct{}{
-	"Accept-Encoding":      {},
-	"Authorization":        {},
-	"Connection":           {},
-	"Content-Length":       {},
-	"Keep-Alive":           {},
-	"Proxy-Authenticate":   {},
-	"Proxy-Authorization":  {},
-	"Proxy-Connection":     {},
-	"Te":                   {},
-	"Trailer":              {},
-	"Transfer-Encoding":    {},
-	"Upgrade":              {},
-	"X-Api-Key":            {},
+	"Accept-Encoding":     {},
+	"Authorization":       {},
+	"Connection":          {},
+	"Content-Length":      {},
+	"Keep-Alive":          {},
+	"Proxy-Authenticate":  {},
+	"Proxy-Authorization": {},
+	"Proxy-Connection":    {},
+	"Te":                  {},
+	"Trailer":             {},
+	"Transfer-Encoding":   {},
+	"Upgrade":             {},
+	"X-Api-Key":           {},
+	"X-Goog-Api-Key":      {},
 }
 
 func newHTTPClient(proxyURL string) *http.Client {
@@ -91,6 +92,15 @@ func copyForwardHeaders(dst, src http.Header) {
 	}
 }
 
+func normalizeAPITypeForRequest(apiType string) string {
+	switch strings.ToLower(strings.TrimSpace(apiType)) {
+	case "gemini":
+		return "google"
+	default:
+		return strings.ToLower(strings.TrimSpace(apiType))
+	}
+}
+
 func buildProviderRequest(ctx context.Context, api config.APIConfig, body []byte, endpoint string, acceptStream bool, originalHeaders http.Header) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -101,10 +111,12 @@ func buildProviderRequest(ctx context.Context, api config.APIConfig, body []byte
 	if acceptStream {
 		req.Header.Set("Accept", "text/event-stream")
 	}
-	switch api.APIType {
+	switch normalizeAPITypeForRequest(api.APIType) {
 	case "anthropic":
 		req.Header.Set("x-api-key", api.APIKey)
 		req.Header.Set("anthropic-version", "2023-06-01")
+	case "google":
+		req.Header.Set("x-goog-api-key", api.APIKey)
 	default:
 		req.Header.Set("Authorization", "Bearer "+api.APIKey)
 	}

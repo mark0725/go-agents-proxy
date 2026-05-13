@@ -8,26 +8,29 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
+const maxLLMLogReadLines = 50000
+
 // LLMCallRecord represents a single LLM API call log entry.
 type LLMCallRecord struct {
-	Timestamp      string `json:"timestamp"`
-	RouteID        string `json:"route_id"`
-	ModelID        string `json:"model_id"`
-	Provider       string `json:"provider"`
-	TargetModel    string `json:"target_model"`
-	DurationMs     int64  `json:"duration_ms"`
-	StatusCode     int    `json:"status_code"`
-	Error          string `json:"error,omitempty"`
-	InputTokens    int    `json:"input_tokens,omitempty"`
-	OutputTokens   int    `json:"output_tokens,omitempty"`
-	StopReason     string `json:"stop_reason,omitempty"`
-	RequestBody    string `json:"request_body,omitempty"`
-	ResponseBody   string `json:"response_body,omitempty"`
+	Timestamp    string `json:"timestamp"`
+	RouteID      string `json:"route_id"`
+	ModelID      string `json:"model_id"`
+	Provider     string `json:"provider"`
+	TargetModel  string `json:"target_model"`
+	DurationMs   int64  `json:"duration_ms"`
+	StatusCode   int    `json:"status_code"`
+	Error        string `json:"error,omitempty"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+	StopReason   string `json:"stop_reason,omitempty"`
+	RequestBody  string `json:"request_body,omitempty"`
+	ResponseBody string `json:"response_body,omitempty"`
 }
 
 // Logger manages application and LLM call logs.
@@ -100,15 +103,33 @@ func (l *Logger) LogLLMCall(record LLMCallRecord) error {
 	return err
 }
 
-// ReadLLMLogs reads LLM logs for a specific date with pagination.
-func (l *Logger) ReadLLMLogs(date string, offset, limit int) ([]LLMCallRecord, int, error) {
-	path := filepath.Join(l.llmDir, fmt.Sprintf("llm-%s.jsonl", date))
-	lines, err := readLastLines(path, 5000)
+// LLMLogQuery describes filter/sort/pagination options for LLM log retrieval.
+type LLMLogQuery struct {
+	Date         string
+	Offset       int
+	Limit        int
+	SortField    string // timestamp | status_code | duration_ms | input_tokens | output_tokens
+	SortDesc     bool
+	StatusFilter string // "" | "success" | "error"
+}
+
+// LLMLogResult is the paginated response for ReadLLMLogs.
+type LLMLogResult struct {
+	Records   []LLMCallRecord
+	Total     int  // total matching records after filter
+	Truncated bool // true when the source file exceeded maxLLMLogReadLines
+}
+
+// ReadLLMLogs reads LLM logs for a specific date, applies optional filter+sort,
+// and returns a paginated slice plus the post-filter total.
+func (l *Logger) ReadLLMLogs(q LLMLogQuery) (*LLMLogResult, error) {
+	path := filepath.Join(l.llmDir, fmt.Sprintf("llm-%s.jsonl", q.Date))
+	lines, err := readLastLines(path, maxLLMLogReadLines)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	var all []LLMCallRecord
+	all := make([]LLMCallRecord, 0, len(lines))
 	for _, line := range lines {
 		var rec LLMCallRecord
 		if err := json.Unmarshal([]byte(line), &rec); err == nil {
@@ -116,15 +137,78 @@ func (l *Logger) ReadLLMLogs(date string, offset, limit int) ([]LLMCallRecord, i
 		}
 	}
 
-	total := len(all)
+	filtered := filterLLMRecords(all, q.StatusFilter)
+	sortLLMRecords(filtered, q.SortField, q.SortDesc)
+
+	total := len(filtered)
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := q.Offset
+	if offset < 0 {
+		offset = 0
+	}
 	if offset >= total {
-		return nil, total, nil
+		return &LLMLogResult{Records: nil, Total: total, Truncated: len(lines) >= maxLLMLogReadLines}, nil
 	}
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	return all[offset:end], total, nil
+	return &LLMLogResult{
+		Records:   filtered[offset:end],
+		Total:     total,
+		Truncated: len(lines) >= maxLLMLogReadLines,
+	}, nil
+}
+
+func filterLLMRecords(records []LLMCallRecord, status string) []LLMCallRecord {
+	switch status {
+	case "error":
+		out := make([]LLMCallRecord, 0, len(records))
+		for _, r := range records {
+			if r.Error != "" || (r.StatusCode != 0 && r.StatusCode >= 400) {
+				out = append(out, r)
+			}
+		}
+		return out
+	case "success":
+		out := make([]LLMCallRecord, 0, len(records))
+		for _, r := range records {
+			if r.Error == "" && r.StatusCode >= 200 && r.StatusCode < 400 {
+				out = append(out, r)
+			}
+		}
+		return out
+	default:
+		return records
+	}
+}
+
+func sortLLMRecords(records []LLMCallRecord, field string, desc bool) {
+	less := llmRecordLess(field)
+	sort.SliceStable(records, func(i, j int) bool {
+		if desc {
+			return less(records[j], records[i])
+		}
+		return less(records[i], records[j])
+	})
+}
+
+func llmRecordLess(field string) func(a, b LLMCallRecord) bool {
+	switch field {
+	case "status_code":
+		return func(a, b LLMCallRecord) bool { return a.StatusCode < b.StatusCode }
+	case "duration_ms":
+		return func(a, b LLMCallRecord) bool { return a.DurationMs < b.DurationMs }
+	case "input_tokens":
+		return func(a, b LLMCallRecord) bool { return a.InputTokens < b.InputTokens }
+	case "output_tokens":
+		return func(a, b LLMCallRecord) bool { return a.OutputTokens < b.OutputTokens }
+	default:
+		return func(a, b LLMCallRecord) bool { return a.Timestamp < b.Timestamp }
+	}
 }
 
 // TailAppLog returns the last N lines of the app log.

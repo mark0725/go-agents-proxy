@@ -143,19 +143,59 @@ func (h *Handler) handleLLMLogs(w http.ResponseWriter, r *http.Request) {
 		limit = 100
 	}
 
-	logs, total, err := h.Logger.ReadLLMLogs(date, offset, limit)
+	sortField := normalizeLLMLogSort(r.URL.Query().Get("sort"))
+	sortDesc := r.URL.Query().Get("order") != "asc"
+	statusFilter := normalizeLLMLogStatus(r.URL.Query().Get("status"))
+
+	result, err := h.Logger.ReadLLMLogs(logger.LLMLogQuery{
+		Date:         date,
+		Offset:       offset,
+		Limit:        limit,
+		SortField:    sortField,
+		SortDesc:     sortDesc,
+		StatusFilter: statusFilter,
+	})
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to read logs: %v", err))
 		return
 	}
 
 	sendJSON(w, http.StatusOK, map[string]interface{}{
-		"date":   date,
-		"total":  total,
-		"offset": offset,
-		"limit":  limit,
-		"logs":   logs,
+		"date":      date,
+		"total":     result.Total,
+		"offset":    offset,
+		"limit":     limit,
+		"sort":      sortField,
+		"order":     queryOrder(sortDesc),
+		"status":    statusFilter,
+		"truncated": result.Truncated,
+		"logs":      result.Records,
 	})
+}
+
+func normalizeLLMLogSort(value string) string {
+	switch value {
+	case "status_code", "duration_ms", "input_tokens", "output_tokens", "timestamp":
+		return value
+	default:
+		return "timestamp"
+	}
+}
+
+func normalizeLLMLogStatus(value string) string {
+	switch value {
+	case "success", "error":
+		return value
+	default:
+		return ""
+	}
+}
+
+func queryOrder(desc bool) string {
+	if desc {
+		return "desc"
+	}
+	return "asc"
 }
 
 func (h *Handler) handleAppLogs(w http.ResponseWriter, r *http.Request) {

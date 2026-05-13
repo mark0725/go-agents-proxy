@@ -14,6 +14,7 @@ function adminApp() {
         llmOffset: 0,
         llmLimit: 50,
         llmTotal: 0,
+        llmTruncated: false,
         appLogs: [],
         appLogAutoRefresh: false,
         appLogInterval: null,
@@ -389,38 +390,40 @@ function adminApp() {
         },
 
         async loadLLMLogs() {
-            const res = await fetch(`/api/logs/llm?date=${this.llmDate}&offset=${this.llmOffset}&limit=${this.llmLimit}`, {
+            const order = this.logSortDesc ? 'desc' : 'asc';
+            const params = new URLSearchParams({
+                date: this.llmDate,
+                offset: String(this.llmOffset),
+                limit: String(this.llmLimit),
+                sort: this.logSortField,
+                order,
+            });
+            if (this.logStatusFilter) {
+                params.set('status', this.logStatusFilter);
+            }
+            const res = await fetch(`/api/logs/llm?${params.toString()}`, {
                 headers: { 'x-api-key': this.apiKey }
             });
             const data = await res.json();
             this.llmLogs = data.logs || [];
             this.llmTotal = data.total || 0;
+            this.llmTruncated = !!data.truncated;
             this.selectedLogEntry = this.llmLogs.length ? this.llmLogs[0] : null;
         },
 
-        sortedLLMLogs() {
-            let logs = [...this.llmLogs];
-            if (this.logStatusFilter) {
-                const filter = this.logStatusFilter;
-                logs = logs.filter(l => {
-                    if (filter === 'error') return !!l.error;
-                    if (filter === 'success') return !l.error && l.status_code && l.status_code < 400;
-                    return true;
-                });
+        reloadLLMLogsFromFirstPage() {
+            this.llmOffset = 0;
+            this.loadLLMLogs();
+        },
+
+        toggleLLMLogSort(field) {
+            if (this.logSortField === field) {
+                this.logSortDesc = !this.logSortDesc;
+            } else {
+                this.logSortField = field;
+                this.logSortDesc = true;
             }
-            logs.sort((a, b) => {
-                let va = a[this.logSortField];
-                let vb = b[this.logSortField];
-                if (this.logSortField === 'timestamp') {
-                    va = new Date(va).getTime();
-                    vb = new Date(vb).getTime();
-                }
-                if (va === undefined) va = '';
-                if (vb === undefined) vb = '';
-                if (this.logSortDesc) return vb > va ? 1 : -1;
-                return va > vb ? 1 : -1;
-            });
-            return logs;
+            this.reloadLLMLogsFromFirstPage();
         },
 
         async loadAppLogs() {

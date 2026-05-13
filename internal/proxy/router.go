@@ -9,11 +9,12 @@ import (
 
 // ResolvedTarget holds the resolved provider API and target model.
 type ResolvedTarget struct {
-	Provider    string
-	ModelID     string
-	API         config.APIConfig
-	APIType     string // normalized: openai, anthropic, gemini
-	Proxy       string // provider-level proxy URL
+	Provider        string
+	ModelID         string
+	API             config.APIConfig
+	ClientAPIType   string // normalized client/request api type
+	ProviderAPIType string // normalized provider/upstream api type
+	Proxy           string // provider-level proxy URL
 }
 
 // ResolveTargets looks up a route and model, returning ordered fallback targets.
@@ -52,18 +53,18 @@ func ResolveTargets(cfg *config.Config, routeID, modelID string) ([]ResolvedTarg
 			continue
 		}
 		api := pickAPI(providerCfg, route.APIType, bestMatch.APIName)
-		// Use the actual API's api_type for handler routing (direct proxy vs conversion).
-		// Fall back to route's api_type if the API config doesn't specify one.
-		apiType := api.APIType
-		if apiType == "" {
-			apiType = route.APIType
+		clientAPIType := normalizeAPIType(route.APIType)
+		providerAPIType := normalizeAPIType(api.APIType)
+		if providerAPIType == "" {
+			providerAPIType = clientAPIType
 		}
 		result = append(result, ResolvedTarget{
-			Provider: bestMatch.Provider,
-			ModelID:  bestMatch.ModelID,
-			API:      api,
-			APIType:  normalizeAPIType(apiType),
-			Proxy:    providerCfg.Proxy,
+			Provider:        bestMatch.Provider,
+			ModelID:         bestMatch.ModelID,
+			API:             api,
+			ClientAPIType:   clientAPIType,
+			ProviderAPIType: providerAPIType,
+			Proxy:           providerCfg.Proxy,
 		})
 	}
 
