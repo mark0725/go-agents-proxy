@@ -26,6 +26,7 @@ routes:
           - model_id: claude-opus-4.7
             provider: anthropic
             api_name: default
+            api_type: anthropic
             status: disable
 
       - model_id: claude-sonnet*
@@ -33,12 +34,14 @@ routes:
           - model_id: anthropic/claude-sonnet-4.6
             provider: openrouter
             api_name: default
+            api_type: anthropic
 
       - model_id: claude-haiku*
         targets:
           - model_id: anthropic/claude-haiku-4.5
             provider: openrouter
             api_name: default
+            api_type: anthropic
 
       # "*" matches any model ID (fallback)
       - model_id: "*"
@@ -46,6 +49,7 @@ routes:
           - model_id: anthropic/claude-sonnet-4.6
             provider: openrouter
             api_name: default
+            api_type: anthropic
 
   # OpenAI-format route
   codex:
