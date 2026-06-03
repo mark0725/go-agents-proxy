@@ -1,261 +1,262 @@
-# Go Agents Proxy
+# Agents Proxy
 
-An  Agents API proxy server written in Go. Accepts Anthropic/OpenAI/Google-format requests and forwards them to configured upstream providers (OpenAI, Google/Gemini, Anthropic) with automatic format conversion, provider failover, and a built-in web management UI.
+Agents Proxy is a configurable LLM API proxy service. It provides a single entry point for clients and forwards requests to configured upstream providers such as Anthropic, OpenAI, Google/Gemini, or compatible third-party APIs.
 
-## Key Features
+The service is designed for managing multiple routes, models, providers, API endpoints, credentials, fallback targets, logs, and request testing from one place.
 
-1. **Config-Driven Routing**: Define routes, models, and provider fallbacks in `config.yaml`
-2. **Multi-Provider Support**: Supports OpenAI, Google (Gemini), and Anthropic API providers
-3. **Automatic Provider Failover**: If one provider fails, automatically tries the next configured target
-4. **API Format Conversion**: Automatically converts Anthropic API format to OpenAI/Google format and converts responses back to Anthropic format
-5. **Streaming Response**: Full support for SSE streaming responses, including `tool_use` events
-6. **Tool Calling**: Supports Anthropic's `tool_use` and `tool_result` format conversion
-7. **Web Management UI**: Built-in admin dashboard at `/` (alpine.js, compiled into the binary)
-8. **Config Hot Reload**: Changes to `config.yaml` are automatically picked up without restart
-9. **Structured Logging**: Application logs via `slog` + per-request LLM call logs in JSONL format
-10. **HTTP Proxy Support**: Supports forwarding requests through an HTTP proxy
+## Features
 
-### LLM API
+- **Unified LLM endpoint**: Send requests through `/llm/<route-id>/v1/messages`.
+- **Multi-provider support**: Use Anthropic, OpenAI, Google/Gemini, or compatible API providers.
+- **Model mapping**: Map client model names to provider-specific upstream model IDs.
+- **Provider failover**: Configure multiple ordered targets for a route and automatically try the next target when one fails.
+- **API type selection**: Configure `api_type` at the route and model-mapping level.
+- **Streaming responses**: Supports SSE streaming responses.
+- **Tool calling**: Supports tool-use requests and responses.
+- **Web management UI**: Manage routes, providers, users, tokens, logs, app settings, and request tests from the built-in UI.
+- **Hot reload**: Configuration changes can be loaded without restarting the service.
+- **Authentication**: Supports API key authentication with `x-api-key` and `Authorization: Bearer` headers.
+- **Logging**: Provides application logs and per-request LLM call logs.
+- **HTTP proxy support**: Supports global proxy settings and provider-level proxy settings.
 
-| Route | Description |
-|-------|-------------|
-| `/llm/<route-id>/v1/messages` | Forward to the route's configured provider(s) |
-| `/llm/<route-id>/v1/messages/count_tokens` | Token counting (proxied for Anthropic, estimated for OpenAI/Google) |
+## Quick Start
 
-The `route-id` is defined in `config.yaml` under `routes`. Each route has an `api_type` (`anthropic`, `openai`, `gemini`) and a list of models with optional fallback `targets`.
+### 1. Create `config.yaml`
 
-### Management API
-
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/api/config` | GET | Get current configuration |
-| `/api/config` | POST | Update configuration (writes to `config.yaml` and hot reloads) |
-| `/api/routes` | GET | List all routes |
-| `/api/providers` | GET | List all providers |
-| `/api/logs/llm` | GET | Query LLM call logs (`?date=YYYY-MM-DD&limit=100&offset=0`) |
-| `/api/logs/app` | GET | Tail application logs (`?limit=100`) |
-
-### Admin UI
-
-Open `http://localhost:8082/` in a browser to access the management dashboard.
-
-![admin ui](./docs/ui-1.png)
-
-## Configuration (`config.yaml`)
+Create a `config.yaml` file with at least one credential, one route, and one provider.
 
 ```yaml
 app:
-  level: info                     # Log level: debug/info/warn/error
-  auth: true                     # Enable API key authentication
-  listen: "0.0.0.0"              # Bind address
-  port: "8082"                   # Listening port (overrides PORT env var)
+  level: info
+  auth: true
+  listen: "0.0.0.0"
+  port: "8082"
 
 users:
   - name: admin
-    token: your_token            # API key for proxy auth
-  - name: admin2
-    password: your_password      # Alternative credential (also accepted)
+    token: your_token
 
 tokens:
   - id: claude-code
-    token: xxxxx                  # Additional API keys
+    token: your_token
 
 routes:
   claude-code:
     api_type: anthropic
     targets:
-      - name: openrouter
+      - name: primary
         enable: true
         models:
-          - match_model: claude-opus*
-            provider: openrouter
-            model_id: anthropic/claude-opus-4-20250514
-            api_name: default
-          - match_model: claude-sonnet*
-            provider: openrouter
-            model_id: anthropic/claude-sonnet-4-20250514
-            api_name: default
-      - name: anthropic
-        enable: true
-        models:
-          - match_model: '*'
+          - match_model: "*"
             provider: anthropic
             model_id: claude-sonnet-4-20250514
             api_name: default
-
-  codex:
-    api_type: openai
-    targets:
-      - name: openrouter
-        enable: true
-        models:
-          - match_model: plan
-            provider: openrouter
-            model_id: gpt-5.5
-            api_name: default
-          - match_model: plan
-            provider: openrouter
-            model_id: gpt-4o
-            api_name: default
+            api_type: anthropic
 
 providers:
-  openrouter:
-    models:
-      - model_id: openai/gpt-5.5
-    apis:
-      - name: default
-        api_type: openai
-        base_url: https://openrouter.ai/api/v1
-        api_key: sk-or-xxx
-
   anthropic:
+    enable: true
     models:
       - model_id: claude-sonnet-4-20250514
     apis:
       - name: default
         api_type: anthropic
         base_url: https://api.anthropic.com/v1
-        api_key: sk-ant-xxx
+        api_key: your_api_key
 ```
 
-### Config Fields
+If a model mapping does not define `api_type`, it uses the route's `api_type` by default.
 
-- `app.level`: Application log level (`debug`/`info`/`warn`/`error`). Overrides `LOG_LEVEL` env var.
-- `app.auth`: Enable/disable API key authentication. Set to `false` to allow all requests.
-- `app.listen`: Bind address (default: `0.0.0.0`).
-- `app.port`: Service listening port. Overrides `PORT` env var.
-- `users`: List of users with API access. Each user has `name`, and either `token` or `password` (both are accepted as valid API keys).
-- `tokens`: Additional API keys (identified by `id`)
-- `routes`: Route definitions
-  - `api_type`: `anthropic`, `openai`, or `gemini`
-  - `targets`: Ordered list of target groups (failover chain). Each group has:
-    - `name`: Identifier for this target group
-    - `enable`: Whether this group is active
-    - `models`: Model mappings within this group
-      - `match_model`: Pattern to match the client-sent model ID. Supports exact match, prefix wildcard (`"prefix-*"`), and full wildcard (`"*"`).
-      - `provider`: The provider to forward matched requests to
-      - `model_id`: The actual model ID sent to the provider
-      - `api_name`: Optional. Selects a specific API endpoint from the provider
-- `providers`: Provider definitions
-  - `proxy`: Optional HTTP proxy URL for requests to this provider (overrides the global `PROXY_URL` env var)
-  - `models`: List of available models (for documentation/validation)
-  - `apis`: List of API endpoints for this provider
-    - `name`: Identifier for this API endpoint
-    - `api_type`: `openai`, `anthropic`, or `gemini`
-    - `base_url`: Base URL for the API
-    - `api_key`: API key
+### 2. Start the service
+
+```bash
+go run main.go
+```
+
+Use a custom config path:
+
+```bash
+go run main.go /path/to/config.yaml
+```
+
+### 3. Send a request
+
+```bash
+curl -X POST http://localhost:8082/llm/claude-code/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_token" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Hello"}
+    ]
+  }'
+```
+
+### 4. Open the web UI
+
+Open the management dashboard in a browser:
+
+```text
+http://localhost:8082/
+```
+
+After logging in, you can manage routes, providers, users, tokens, app settings, logs, and test requests.
+
+![admin ui](./docs/ui-1.png)
+
+## LLM API
+
+| Route | Description |
+|-------|-------------|
+| `/llm/<route-id>/v1/messages` | Send an LLM request to the configured route |
+| `/llm/<route-id>/v1/messages/count_tokens` | Count tokens for a request |
+
+## Management API
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/config` | GET | Get the current configuration |
+| `/api/config` | POST | Update the configuration |
+| `/api/routes` | GET | List routes |
+| `/api/providers` | GET | List providers |
+| `/api/logs/llm` | GET | Query LLM call logs |
+| `/api/logs/app` | GET | Query application logs |
+
+## Configuration Reference
+
+### `app`
+
+| Field | Description |
+|-------|-------------|
+| `level` | Application log level: `debug`, `info`, `warn`, or `error` |
+| `auth` | Enables or disables authentication |
+| `listen` | Listen address |
+| `port` | Listen port |
+
+### `users` and `tokens`
+
+Use `users` and `tokens` to configure credentials for clients that access Agents Proxy.
+
+Supported request headers:
+
+```text
+x-api-key: your_token
+Authorization: Bearer your_token
+```
+
+If `app.auth` is `false`, requests do not require authentication.
+
+### `routes`
+
+Routes define client-facing API entries and model forwarding rules.
+
+| Field | Description |
+|-------|-------------|
+| `api_type` | Client-facing API type: `anthropic`, `openai`, or `gemini` |
+| `targets` | Ordered target groups used for forwarding and failover |
+| `targets[].name` | Target group name |
+| `targets[].enable` | Enables or disables the target group |
+| `targets[].models[].match_model` | Client model matching rule; supports exact match, prefix wildcard, and `*` |
+| `targets[].models[].provider` | Provider used for the matched model |
+| `targets[].models[].model_id` | Upstream model ID sent to the provider |
+| `targets[].models[].api_name` | Provider API endpoint name |
+| `targets[].models[].api_type` | Provider API type; defaults to the route `api_type` when omitted |
+
+### `providers`
+
+Providers define upstream services, models, API endpoints, and optional proxy settings.
+
+| Field | Description |
+|-------|-------------|
+| `enable` | Enables or disables the provider |
+| `proxy` | Optional provider-specific HTTP proxy URL |
+| `models` | Models available for this provider |
+| `apis[].name` | API endpoint name |
+| `apis[].api_type` | API endpoint type: `anthropic`, `openai`, or `gemini` |
+| `apis[].base_url` | API endpoint base URL |
+| `apis[].api_key` | API key for the endpoint |
+
+Within the same provider, the combination of `api_name` and `api_type` must be unique.
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PORT` | No | `8082` | Service listening port. Can be overridden by `app.port` in `config.yaml` |
-| `LOG_LEVEL` | No | `info` | Log level (`debug`/`info`/`warn`/`error`). Can be overridden by `app.level` in `config.yaml` |
+| `PORT` | No | `8082` | Service port; can be overridden by `app.port` in `config.yaml` |
+| `LOG_LEVEL` | No | `info` | Log level; can be overridden by `app.level` in `config.yaml` |
+| `PROXY_URL` | No | - | Global HTTP proxy URL |
 
-API keys and base URLs are now configured in `config.yaml` instead of environment variables. The `.env` file is still supported for `PORT`, `LOG_LEVEL`, and `PROXY_URL`.
+A `.env` file can be used for these environment variables. API keys and upstream base URLs should be configured in `config.yaml`.
 
-## Usage
-
-### 1. Create `config.yaml`
-
-See the example above. At minimum, define one route and one provider. If `app.auth` is `true` (default), configure at least one user or token.
-
-### 2. Run Service
+## Build
 
 ```bash
-go run main.go
-# Or with a custom config path:
-go run main.go /path/to/config.yaml
+go build -o agents-proxy .
 ```
 
-### 3. Send Requests
+Run the built binary:
 
 ```bash
-# Send to a route (e.g. 'claude-code' defined in config.yaml)
-curl -X POST http://localhost:8082/llm/claude-code/v1/messages \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your_token" \
-  -d '{
-    "model": "code",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+./agents-proxy
 ```
 
-The proxy will look up the route `claude-code`, find the model `code`, resolve its targets, and forward the request. If the first target fails with a network error or 5xx, it automatically tries the next target.
-
-### 4. Manage via Web UI
-
-Open `http://localhost:8082/` and log in with your API key to browse routes, providers, logs, and edit configuration.
-
-## Authentication
-
-The proxy service supports two authentication methods:
-
-1. **x-api-key Header**: `x-api-key: your_token`
-2. **Authorization Header**: `Authorization: Bearer your_token`
-
-The token is matched against all `users` tokens/passwords and all `tokens` entries. If `app.auth` is set to `false`, authentication is disabled and all requests are accepted. If auth is enabled but no users or tokens are configured, all requests are rejected.
-
-## Feature Details
-
-### Format Conversion
-
-- **OpenAI/Gemini Routes**: Converts Anthropic format requests to OpenAI format, calls the corresponding API, then converts responses back to Anthropic format
-- **Anthropic Route**: Directly proxies requests to Anthropic API without format conversion
-
-### Streaming Response
-
-Supports SSE (Server-Sent Events) streaming responses, including:
-- `message_start` - Message start
-- `content_block_start` - Content block start
-- `content_block_delta` - Content delta
-- `content_block_stop` - Content block stop
-- `message_delta` - Message delta
-- `message_stop` - Message stop
-
-### Tool Calling
-
-Full support for tool calling functionality:
-- Converts Anthropic's `tools` format to OpenAI's `functions` format
-- Handles `tool_use` and `tool_result` message types
-- Automatically cleans up schema fields not supported by Google API
-
-### Logging
-
-- **Application log**: `logs/app.log` — structured text logs via `slog`
-- **LLM call log**: `logs/llm-YYYY-MM-DD.jsonl` — one JSON line per API call with fields: `timestamp`, `route_id`, `model_id`, `provider`, `target_model`, `duration_ms`, `status_code`, `error`, `input_tokens`, `output_tokens`
-
-Both logs are browsable through the web UI.
-
-## Dependencies
-
-- [github.com/google/uuid](https://github.com/google/uuid) — UUID generation
-- [github.com/joho/godotenv](https://github.com/joho/godotenv) — Environment variable loading
-- [github.com/fsnotify/fsnotify](https://github.com/fsnotify/fsnotify) — Config file watching
-- [gopkg.in/yaml.v3](https://gopkg.in/yaml.v3) — YAML parsing
-
-## Install Dependencies
+Run with a custom config path:
 
 ```bash
-go mod tidy
+./agents-proxy /path/to/config.yaml
 ```
 
-## Docker
+## Docker Deployment
 
-### Build Image
+Build an image:
 
 ```bash
-docker build -t go-agents-proxy .
+docker build -t agents-proxy .
 ```
 
-### Run Container
+Run a container:
 
 ```bash
-docker run -d -p 8082:8082 \
-    -v $(pwd)/config.yaml:/app/config.yaml \
-    ghcr.io/mark0725/go-agents-proxy:latest
+docker run -d \
+  -p 8082:8082 \
+  -v /etc/localtime:/etc/localtime:ro \
+  -v /etc/timezone:/etc/timezone:ro \
+  -e "TZ=Asia/Shanghai" \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/logs:/app/logs \
+  --name agents-proxy \
+  agents-proxy
 ```
+
+Or use the published image:
+
+```bash
+docker run -d \
+  -p 8082:8082 \
+  -v /etc/localtime:/etc/localtime:ro \
+  -v /etc/timezone:/etc/timezone:ro \
+  -e "TZ=Asia/Shanghai" \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/logs:/app/logs \
+  --name agents-proxy \
+  ghcr.io/mark0725/go-agents-proxy:latest
+```
+
+Make sure the host config file and log directory exist before starting the container:
+
+```text
+$(pwd)/config.yaml
+$(pwd)/logs
+```
+
+## Logs
+
+- Application log: `logs/app.log`
+- LLM call logs: `logs/llm-YYYY-MM-DD.jsonl`
+
+Logs can also be viewed from the web management UI.
 
 ## License
 
