@@ -379,7 +379,7 @@
                                 <div>
                                     <div class="flex items-center justify-between mb-4">
                                         <div class="flex items-center gap-3">
-                                            <input :value="selectedProvider" type="text" readonly class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48">
+                                            <input :value="selectedProvider" @change="renameProvider(selectedProvider, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
                                             <input x-model="configProviders[selectedProvider].name" type="text" placeholder="Display name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48">
                                             <label class="flex items-center gap-2 text-sm cursor-pointer border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 h-[42px]">
                                                 <input x-model="configProviders[selectedProvider].enable" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">

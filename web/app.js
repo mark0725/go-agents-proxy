@@ -368,6 +368,26 @@ function adminApp() {
             this.configProviders = copy;
             this.selectDefaultConfigItems();
         },
+        renameProvider(oldId, newId) {
+            newId = newId.trim();
+            if (!newId || newId === oldId) return;
+            if (this.configProviders[newId]) {
+                alert('Provider ID already exists');
+                return;
+            }
+            const copy = { ...this.configProviders };
+            copy[newId] = copy[oldId];
+            delete copy[oldId];
+            this.configProviders = copy;
+            this.selectedProvider = newId;
+            for (const route of Object.values(this.configRoutes || {})) {
+                for (const target of route.targets || []) {
+                    for (const model of target.models || []) {
+                        if (model.provider === oldId) model.provider = newId;
+                    }
+                }
+            }
+        },
         addProviderModel(providerId) {
             const p = this.configProviders[providerId];
             if (!p) return;
