@@ -41,6 +41,7 @@ type ModelMapping struct {
 	Provider   string `yaml:"provider" json:"provider"`
 	ModelID    string `yaml:"model_id" json:"model_id"`
 	APIName    string `yaml:"api_name" json:"api_name"`
+	APIType    string `yaml:"api_type" json:"api_type"`
 }
 
 // RouteTarget is a target group within a route, containing model mappings.
@@ -144,6 +145,11 @@ func NormalizeConfig(cfg *Config) {
 				enabled := true
 				route.Targets[i].Enable = &enabled
 			}
+			for j := range route.Targets[i].Models {
+				if strings.TrimSpace(route.Targets[i].Models[j].APIType) == "" {
+					route.Targets[i].Models[j].APIType = route.APIType
+				}
+			}
 		}
 		cfg.Routes[routeID] = route
 	}
@@ -228,8 +234,12 @@ func ValidateConfig(cfg *Config) []ValidationError {
 				} else if !providerHasModel(provider, model.ModelID) {
 					errs = append(errs, ValidationError{Path: modelPath + ".model_id", Message: "model_id must exist in the selected provider models"})
 				}
-				if apiName := strings.TrimSpace(model.APIName); apiName != "" && !providerHasAPI(provider, apiName) {
-					errs = append(errs, ValidationError{Path: modelPath + ".api_name", Message: "api_name must exist in the selected provider"})
+				apiType := strings.TrimSpace(model.APIType)
+				if !isValidAPIType(apiType) {
+					errs = append(errs, ValidationError{Path: modelPath + ".api_type", Message: "api_type must be one of anthropic, openai, gemini"})
+				}
+				if apiName := strings.TrimSpace(model.APIName); apiName != "" && isValidAPIType(apiType) && !providerHasAPI(provider, apiName, apiType) {
+					errs = append(errs, ValidationError{Path: modelPath + ".api_name", Message: "api_name + api_type must exist in the selected provider"})
 				}
 				if len(provider.APIs) == 0 {
 					errs = append(errs, ValidationError{Path: "providers." + providerName + ".apis", Message: "provider must define at least one api"})
@@ -250,9 +260,9 @@ func providerHasModel(provider ProviderConfig, modelID string) bool {
 	return false
 }
 
-func providerHasAPI(provider ProviderConfig, apiName string) bool {
+func providerHasAPI(provider ProviderConfig, apiName, apiType string) bool {
 	for _, api := range provider.APIs {
-		if api.Name == apiName {
+		if api.Name == apiName && strings.EqualFold(api.APIType, apiType) {
 			return true
 		}
 	}

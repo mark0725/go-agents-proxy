@@ -138,7 +138,6 @@ function adminApp() {
             this.configRoutes = JSON.parse(JSON.stringify(data.routes || {}));
             this.configProviders = JSON.parse(JSON.stringify(data.providers || {}));
             this.ensureRouteEditorKeys();
-            // Normalize routes: ensure api_name defaults to 'default' and target.enable defaults to true
             for (const route of Object.values(this.configRoutes)) {
                 if (!route.targets) continue;
                 for (const target of route.targets) {
@@ -146,6 +145,7 @@ function adminApp() {
                     if (!target.models) continue;
                     for (const m of target.models) {
                         if (m.api_name === undefined || m.api_name === null) m.api_name = 'default';
+                        if (!m.api_type) m.api_type = route.api_type;
                     }
                 }
             }
@@ -347,7 +347,7 @@ function adminApp() {
             const route = this.configRoutes[routeId];
             if (!route || !route.targets || !route.targets[targetIdx]) return;
             if (!route.targets[targetIdx].models) route.targets[targetIdx].models = [];
-            route.targets[targetIdx].models.push({ __uiKey: this.createUIKey(), match_model: '', provider: '', model_id: '', api_name: 'default' });
+            route.targets[targetIdx].models.push({ __uiKey: this.createUIKey(), match_model: '', provider: '', model_id: '', api_name: 'default', api_type: route.api_type });
         },
         removeRouteModel(routeId, targetIdx, mIdx) {
             const route = this.configRoutes[routeId];
@@ -643,6 +643,43 @@ function adminApp() {
             return (this.configProviders[providerName] || {}).apis || [];
         },
 
+        providerApiValue(apiName, apiType) {
+            return JSON.stringify([apiName || '', apiType || '']);
+        },
+
+        providerApiOptions(providerName, selectedAPIName, selectedAPIType) {
+            const apis = this.providerApis(providerName);
+            const options = apis.map(api => ({
+                value: this.providerApiValue(api.name, api.api_type),
+                label: `${api.name} (${api.api_type})`,
+                missing: false,
+            }));
+            if (selectedAPIName && !apis.some(api => api.name === selectedAPIName && api.api_type === selectedAPIType)) {
+                options.unshift({
+                    value: this.providerApiValue(selectedAPIName, selectedAPIType),
+                    label: `${selectedAPIName} (${selectedAPIType || '...'})`,
+                    missing: true,
+                });
+            }
+            return options;
+        },
+
+        selectedProviderApiValue(mapping) {
+            return this.providerApiValue(mapping?.api_name || '', mapping?.api_type || '');
+        },
+
+        setRouteModelAPI(mapping, value) {
+            if (!mapping) return;
+            if (!value) {
+                mapping.api_name = '';
+                mapping.api_type = '';
+                return;
+            }
+            const [apiName, apiType] = JSON.parse(value);
+            mapping.api_name = apiName;
+            mapping.api_type = apiType;
+        },
+
         providerModels(providerName) {
             return ((this.configProviders[providerName] || {}).models || [])
                 .map(m => typeof m === 'string' ? m : m.model_id)
@@ -682,15 +719,27 @@ function adminApp() {
             return (this.configTokens || []).find(t => t?.id === this.testTokenId) || null;
         },
 
-        syncRouteModelSelection(mapping) {
+        syncRouteModelSelection(mapping, routeId) {
             if (!mapping) return;
             const models = this.providerModels(mapping.provider);
             if (!models.length) {
                 mapping.model_id = '';
+            } else if (!mapping.model_id || !models.includes(mapping.model_id)) {
+                mapping.model_id = models[0];
+            }
+
+            const routeAPIType = (this.configRoutes[routeId] || {}).api_type || '';
+            if (!mapping.api_type) mapping.api_type = routeAPIType;
+            const apis = this.providerApis(mapping.provider);
+            if (!apis.length) {
+                mapping.api_name = '';
+                mapping.api_type = routeAPIType;
                 return;
             }
-            if (!mapping.model_id || !models.includes(mapping.model_id)) {
-                mapping.model_id = models[0];
+            if (!apis.some(api => api.name === mapping.api_name && api.api_type === mapping.api_type)) {
+                const api = apis.find(api => api.api_type === mapping.api_type) || apis[0];
+                mapping.api_name = api.name;
+                mapping.api_type = api.api_type;
             }
         },
 

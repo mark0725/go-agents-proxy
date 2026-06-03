@@ -52,7 +52,11 @@ func ResolveTargets(cfg *config.Config, routeID, modelID string) ([]ResolvedTarg
 		if !ok || !providerCfg.Enable {
 			continue
 		}
-		api := pickAPI(providerCfg, route.APIType, bestMatch.APIName)
+		apiType := bestMatch.APIType
+		if strings.TrimSpace(apiType) == "" {
+			apiType = route.APIType
+		}
+		api := pickAPI(providerCfg, apiType, bestMatch.APIName)
 		clientAPIType := normalizeAPIType(route.APIType)
 		providerAPIType := normalizeAPIType(api.APIType)
 		if providerAPIType == "" {
@@ -75,31 +79,19 @@ func ResolveTargets(cfg *config.Config, routeID, modelID string) ([]ResolvedTarg
 }
 
 // pickAPI selects the best matching API from a provider config.
-// Priority: (name + type match) > (name match) > (type match) > first available.
-func pickAPI(providerCfg config.ProviderConfig, routeAPIType, apiName string) config.APIConfig {
-	// 1. Exact match: both name and api_type
+func pickAPI(providerCfg config.ProviderConfig, apiType, apiName string) config.APIConfig {
 	if apiName != "" {
 		for _, api := range providerCfg.APIs {
-			if api.Name == apiName && api.APIType == routeAPIType {
+			if api.Name == apiName && strings.EqualFold(api.APIType, apiType) {
 				return api
 			}
 		}
 	}
-	// 2. Match by name only
-	if apiName != "" {
-		for _, api := range providerCfg.APIs {
-			if api.Name == apiName {
-				return api
-			}
-		}
-	}
-	// 3. Match by api_type
 	for _, api := range providerCfg.APIs {
-		if api.APIType == routeAPIType {
+		if strings.EqualFold(api.APIType, apiType) {
 			return api
 		}
 	}
-	// 4. Fall back to first available
 	if len(providerCfg.APIs) > 0 {
 		return providerCfg.APIs[0]
 	}
@@ -108,9 +100,10 @@ func pickAPI(providerCfg config.ProviderConfig, routeAPIType, apiName string) co
 
 // matchPriority returns a priority score for how well pattern matches modelID.
 // Higher score = better match. -1 means no match.
-//   exact match      -> stops search immediately (highest priority)
-//   "prefix*" match  -> len(prefix) (longer prefix = higher priority)
-//   "*" match        -> 0 (lowest priority)
+//
+//	exact match      -> stops search immediately (highest priority)
+//	"prefix*" match  -> len(prefix) (longer prefix = higher priority)
+//	"*" match        -> 0 (lowest priority)
 func matchPriority(pattern, modelID string) int {
 	if pattern == "*" {
 		return 0

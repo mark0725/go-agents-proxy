@@ -27,6 +27,7 @@ go.work.sum
 # env/config files
 .env
 config.yaml
+build.sh
 
 # Editor/IDE
 # .idea/

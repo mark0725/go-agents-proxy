@@ -30,20 +30,36 @@
 
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">A</div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-4">
+            <div class="flex items-center gap-3 shrink-0">
+                <div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">Go</div>
                 <div>
-                    <h1 class="text-lg font-bold leading-tight">Go Agents Proxy</h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold leading-tight">Agents Proxy</h1>
+                        <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800">v1.0</span>
+                    </div>
                     <p class="text-xs text-gray-500 dark:text-gray-400">Management Dashboard</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <nav x-show="authenticated" class="flex-1 flex gap-1 overflow-x-auto">
+                <button @click="tab = 'routes'" :class="tab === 'routes' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Routes
+                </button>
+                <button @click="tab = 'providers'" :class="tab === 'providers' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    Providers
+                </button>
+            </nav>
+            <div class="flex items-center gap-2 shrink-0 ml-auto">
+                <button x-show="authenticated" @click="tab = 'app-settings'" :class="['app-settings','users','tokens','llmlogs','applogs','test'].includes(tab) ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn p-2 rounded-lg transition" title="App Settings">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </button>
                 <button @click="toggleDarkMode()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition" title="Toggle dark mode">
                     <svg x-show="!darkMode" class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg x-show="darkMode" class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
-                <div x-show="authenticated" class="flex items-center gap-3">
+                <div x-show="authenticated" class="flex items-center gap-2">
                     <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="apiKey.substring(0,8)+'...'"></span>
                     <button @click="logout()" class="text-sm text-gray-500 hover:text-red-600 px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Logout</button>
                 </div>
@@ -57,7 +73,7 @@
         <div x-show="!authenticated" class="max-w-md mx-auto mt-12">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-8">
                 <div class="text-center mb-6">
-                    <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-4 shadow-sm">A</div>
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-4 shadow-sm">Go</div>
                     <h2 class="text-xl font-bold">Welcome</h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your API key to access the dashboard</p>
                 </div>
@@ -74,42 +90,6 @@
 
         <template x-if="authenticated">
             <div class="fade-in">
-                <!-- Tabs -->
-                <div class="flex gap-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 p-1 mb-6 overflow-x-auto">
-                    <button @click="tab = 'routes'" :class="tab === 'routes' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        Routes
-                    </button>
-                    <button @click="tab = 'providers'" :class="tab === 'providers' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                        Providers
-                    </button>
-                    <button @click="tab = 'users'" :class="tab === 'users' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                        Users
-                    </button>
-                    <button @click="tab = 'tokens'" :class="tab === 'tokens' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                        Tokens
-                    </button>
-                    <button @click="tab = 'app-settings'" :class="tab === 'app-settings' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        App Settings
-                    </button>
-                    <button @click="tab = 'llmlogs'" :class="tab === 'llmlogs' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        LLM Logs
-                    </button>
-                    <button @click="tab = 'applogs'" :class="tab === 'applogs' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-                        App Logs
-                    </button>
-                    <button @click="tab = 'test'" :class="tab === 'test' ? 'tab-active bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400'" class="tab-btn px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        Test
-                    </button>
-                </div>
-
                 <!-- Save/Reload bar (shown on all config tabs) -->
                 <div x-show="['app-settings','users','tokens','routes','providers'].includes(tab)" class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700 px-4 py-3">
                     <p x-show="configMessage" x-text="configMessage" x-transition :class="configError ? 'text-red-500' : 'text-green-600 dark:text-green-400'" class="text-sm font-medium break-words max-w-full lg:max-w-[70%]"></p>
@@ -120,6 +100,67 @@
                     </div>
                 </div>
 
+                <!-- Settings -->
+                <div x-show="['app-settings','users','tokens','llmlogs','applogs','test'].includes(tab)" x-cloak>
+                    <div class="grid grid-cols-1 xl:grid-cols-6 gap-4">
+                        <aside class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 h-fit">
+                            <h2 class="text-base font-bold mb-4">Settings</h2>
+                            <div class="space-y-5">
+                                <div>
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2 px-1">Configuration</div>
+                                    <div class="space-y-1">
+                                    <button @click="tab = 'app-settings'" :class="tab === 'app-settings' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">Application</button>
+                                    <button @click="tab = 'users'" :class="tab === 'users' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">Users</button>
+                                    <button @click="tab = 'tokens'" :class="tab === 'tokens' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">Tokens</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2 px-1">Observability</div>
+                                    <div class="space-y-1">
+                                    <button @click="tab = 'llmlogs'" :class="tab === 'llmlogs' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">LLM Logs</button>
+                                    <button @click="tab = 'applogs'" :class="tab === 'applogs' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">App Logs</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2 px-1">Tools</div>
+                                    <div class="space-y-1">
+                                    <button @click="tab = 'test'" :class="tab === 'test' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300' : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'" class="w-full text-left border rounded-lg px-3 py-2 text-sm font-medium transition">Test Tool</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                        <div class="xl:col-span-5 min-w-0">
+                            <div x-show="tab === 'app-settings'" x-cloak>
+                                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                                    <h2 class="text-lg font-bold mb-4">Application Settings</h2>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Log Level</label>
+                                            <select x-model="configApp.level" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="debug">debug</option>
+                                                <option value="info">info</option>
+                                                <option value="warn">warn</option>
+                                                <option value="error">error</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Auth</label>
+                                            <label class="flex items-center gap-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm cursor-pointer h-[42px]">
+                                                <input x-model="configApp.auth" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                                                <span x-text="configApp.auth ? 'Enabled' : 'Disabled'"></span>
+                                            </label>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Listen Address</label>
+                                            <input x-model="configApp.listen" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Port</label>
+                                            <input x-model="configApp.port" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                 <!-- Users -->
                 <div x-show="tab === 'users'" x-cloak>
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
@@ -181,265 +222,6 @@
                             </table>
                         </div>
                         <div x-show="configTokens.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">No tokens configured</div>
-                    </div>
-                </div>
-
-                <!-- App Settings (left list + right detail) -->
-                <div x-show="tab === 'app-settings'" x-cloak>
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
-                            <h2 class="text-base font-bold mb-3">Settings</h2>
-                            <div class="space-y-1">
-                                <div class="cursor-pointer border rounded-lg px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 transition">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm font-medium">Application</span>
-                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
-                            <h2 class="text-lg font-bold mb-4">Application Settings</h2>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Log Level</label>
-                                    <select x-model="configApp.level" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="debug">debug</option>
-                                        <option value="info">info</option>
-                                        <option value="warn">warn</option>
-                                        <option value="error">error</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Auth</label>
-                                    <label class="flex items-center gap-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm cursor-pointer h-[42px]">
-                                        <input x-model="configApp.auth" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                                        <span x-text="configApp.auth ? 'Enabled' : 'Disabled'"></span>
-                                    </label>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Listen Address</label>
-                                    <input x-model="configApp.listen" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Port</label>
-                                    <input x-model="configApp.port" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Routes -->
-                <div x-show="tab === 'routes'" x-cloak>
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
-                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
-                            <div class="flex items-center justify-between mb-3 gap-2">
-                                <h2 class="text-base font-bold">Routes</h2>
-                                <button @click="addRoute()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
-                            </div>
-                            <input x-model="routeFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
-                            <div class="flex-1 overflow-auto space-y-1">
-                                <template x-for="(route, id) in filteredConfigRoutes()" :key="id">
-                                    <div @click="selectedRoute = id" :class="selectedRoute === id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-sm font-mono font-medium truncate" x-text="id"></span>
-                                            <span class="text-xs px-1.5 py-0.5 rounded" :class="apiTypeBadgeClass(route.api_type)" x-text="route.api_type"></span>
-                                        </div>
-                                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5" x-text="(route.targets || []).length + ' targets'"></div>
-                                    </div>
-                                </template>
-                                <div x-show="Object.keys(filteredConfigRoutes()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No routes</div>
-                            </div>
-                        </div>
-                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 overflow-auto">
-                            <template x-if="!selectedRoute || !configRoutes[selectedRoute]">
-                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a route from the list to edit</div>
-                            </template>
-                            <template x-if="selectedRoute && configRoutes[selectedRoute]">
-                                <div>
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div class="flex items-center gap-3">
-                                            <input :value="selectedRoute" @change="renameRoute(selectedRoute, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
-                                            <select x-model="configRoutes[selectedRoute].api_type" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                                                <option value="anthropic">anthropic</option>
-                                                <option value="openai">openai</option>
-                                                <option value="gemini">gemini</option>
-                                            </select>
-                                        </div>
-                                        <button @click="removeRoute(selectedRoute)" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Route</button>
-                                    </div>
-                                    <div class="space-y-4">
-                                        <div class="flex items-center justify-between">
-                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Target Groups</h3>
-                                            <button @click="addRouteTargetGroup(selectedRoute)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Target Group</button>
-                                        </div>
-                                        <div class="space-y-3">
-                                            <template x-for="(target, tIdx) in configRoutes[selectedRoute].targets" :key="target.__uiKey || (selectedRoute + ':target:' + tIdx)">
-                                                <div
-                                                    draggable="true"
-                                                    @dragstart="startRouteTargetDrag(selectedRoute, tIdx)"
-                                                    @dragenter.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
-                                                    @dragover.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
-                                                    @drop.prevent="dropRouteTargetGroup(selectedRoute, tIdx)"
-                                                    @dragend="clearRouteTargetDragState()"
-                                                    :class="dragOverRouteTargetIndex === tIdx ? 'ring-2 ring-blue-400 border-blue-300 dark:border-blue-700' : ''"
-                                                    class="border dark:border-gray-700 rounded-lg p-4 transition">
-                                                    <div class="flex items-center gap-3 mb-3">
-                                                        <button type="button" draggable="true" @dragstart.stop="startRouteTargetDrag(selectedRoute, tIdx)" class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Drag to reorder">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h.01M8 15h.01M12 9h.01M12 15h.01M16 9h.01M16 15h.01"/></svg>
-                                                        </button>
-                                                        <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-8" x-text="'#' + (tIdx + 1)"></span>
-                                                        <input x-model="target.name" type="text" placeholder="group name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-40">
-                                                        <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-                                                            <input type="checkbox" x-model="target.enable" class="rounded border-gray-300 dark:border-gray-600">
-                                                            <span>Enable</span>
-                                                        </label>
-                                                        <span class="text-xs text-gray-400 dark:text-gray-500">Priority higher when placed earlier</span>
-                                                        <button @click="removeRouteTargetGroup(selectedRoute, tIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition ml-auto">Remove</button>
-                                                    </div>
-                                                    <div class="pl-4 border-l-2 border-gray-200 dark:border-gray-600">
-                                                        <div class="flex items-center justify-between mb-2">
-                                                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Model Mappings</span>
-                                                            <button @click="addRouteModel(selectedRoute, tIdx)" class="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-0.5 rounded transition">+ Mapping</button>
-                                                        </div>
-                                                        <template x-for="(m, mIdx) in target.models" :key="m.__uiKey || (selectedRoute + ':target:' + tIdx + ':model:' + mIdx)">
-                                                            <div class="flex items-center gap-2 mb-1.5">
-                                                                <input x-model="m.match_model" type="text" placeholder="match_model" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-32">
-                                                                <select @change="m.provider = $event.target.value; syncRouteModelSelection(m)" x-init="$nextTick(() => { $el.value = m.provider || '' })" x-effect="$nextTick(() => { $el.value = m.provider || '' })" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
-                                                                    <option value="">-- provider --</option>
-                                                                    <option x-show="m.provider && !enabledConfigProvidersForRoutes()[m.provider]" :value="m.provider" x-text="m.provider" disabled></option>
-                                                                    <template x-for="(p, pname) in enabledConfigProvidersForRoutes()" :key="pname">
-                                                                        <option :value="pname" x-text="pname"></option>
-                                                                    </template>
-                                                                </select>
-                                                                <select @change="m.model_id = $event.target.value" x-init="$nextTick(() => { $el.value = m.model_id || '' })" x-effect="$nextTick(() => { $el.value = m.model_id || '' })" :disabled="!m.provider || providerModels(m.provider).length === 0" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1">
-                                                                    <option value="" x-show="!m.provider">-- model --</option>
-                                                                    <option value="" x-show="m.provider && providerModels(m.provider).length === 0">No models</option>
-                                                                    <template x-for="option in providerModelOptions(m.provider, m.model_id)" :key="option.value + ':' + option.label">
-                                                                        <option :value="option.value" x-text="option.label" :disabled="option.missing"></option>
-                                                                    </template>
-                                                                </select>
-                                                                <select @change="m.api_name = $event.target.value" x-init="$nextTick(() => { $el.value = m.api_name || '' })" x-effect="$nextTick(() => { $el.value = m.api_name || '' })" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
-                                                                    <option value="">-- api --</option>
-                                                                    <option x-show="m.api_name && !providerApis(m.provider).some(api => api.name === m.api_name)" :value="m.api_name" x-text="m.api_name + ' (...)'" disabled></option>
-                                                                    <template x-for="api in providerApis(m.provider)" :key="api.name + ':' + api.api_type">
-                                                                        <option :value="api.name" x-text="api.name + ' (' + api.api_type + ')' "></option>
-                                                                    </template>
-                                                                </select>
-                                                                <button @click="removeRouteModel(selectedRoute, tIdx, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-1 rounded transition">&times;</button>
-                                                            </div>
-                                                        </template>
-                                                        <div x-show="!target.models || target.models.length === 0" class="text-xs text-gray-400 dark:text-gray-500 py-1">No model mappings</div>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                            <div x-show="!configRoutes[selectedRoute].targets || configRoutes[selectedRoute].targets.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-4">No target groups configured</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Providers -->
-                <div x-show="tab === 'providers'" x-cloak>
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
-                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
-                            <div class="flex items-center justify-between mb-3 gap-2">
-                                <h2 class="text-base font-bold">Providers</h2>
-                                <button @click="addProvider()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
-                            </div>
-                            <input x-model="providerFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            <select x-model="providerTypeFilter" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="">All Types</option>
-                                <template x-for="t in providerTypes" :key="t">
-                                    <option :value="t" x-text="t"></option>
-                                </template>
-                            </select>
-                            <div class="flex-1 overflow-auto space-y-1">
-                                <template x-for="(provider, name) in filteredConfigProviders()" :key="name">
-                                    <div @click="selectedProvider = name" :class="selectedProvider === name ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-sm font-mono font-medium truncate" x-text="name"></span>
-                                            <span x-show="provider.enable" class="w-2 h-2 bg-green-500 rounded-full"></span>
-                                        </div>
-                                        <div x-show="provider.name" class="text-xs text-gray-400 dark:text-gray-500 truncate" x-text="provider.name"></div>
-                                    </div>
-                                </template>
-                                <div x-show="Object.keys(filteredConfigProviders()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No providers</div>
-                            </div>
-                        </div>
-                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 overflow-auto">
-                            <template x-if="!selectedProvider || !configProviders[selectedProvider]">
-                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a provider from the list to edit</div>
-                            </template>
-                            <template x-if="selectedProvider && configProviders[selectedProvider]">
-                                <div>
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div class="flex items-center gap-3">
-                                            <input :value="selectedProvider" @change="renameProvider(selectedProvider, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
-                                            <input x-model="configProviders[selectedProvider].name" type="text" placeholder="Display name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48">
-                                            <label class="flex items-center gap-2 text-sm cursor-pointer border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 h-[42px]">
-                                                <input x-model="configProviders[selectedProvider].enable" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                                                <span class="text-gray-600 dark:text-gray-300 text-sm" x-text="configProviders[selectedProvider].enable ? 'Enabled' : 'Disabled'"></span>
-                                            </label>
-                                        </div>
-                                        <button @click="removeProvider(selectedProvider)" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Provider</button>
-                                    </div>
-                                    <div class="space-y-6">
-                                        <div>
-                                            <div class="flex items-center justify-between mb-2">
-                                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Models</h3>
-                                                <button @click="addProviderModel(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
-                                            </div>
-                                            <div class="space-y-2">
-                                                <template x-for="(m, mIdx) in configProviders[selectedProvider].models" :key="mIdx">
-                                                    <div class="flex items-center gap-2">
-                                                        <input x-model="m.model_id" type="text" placeholder="model_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-80">
-                                                        <button @click="removeProviderModel(selectedProvider, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
-                                                    </div>
-                                                </template>
-                                                <div x-show="!configProviders[selectedProvider].models || configProviders[selectedProvider].models.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No models configured</div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div class="flex items-center justify-between mb-2">
-                                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">APIs</h3>
-                                                <button @click="addProviderAPI(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add API</button>
-                                            </div>
-                                            <div class="space-y-2">
-                                                <template x-for="(api, aIdx) in configProviders[selectedProvider].apis" :key="aIdx">
-                                                    <div class="flex items-center gap-2">
-                                                        <input x-model="api.name" type="text" placeholder="name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-24">
-                                                        <select x-model="api.api_type" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-28">
-                                                            <option value="openai">openai</option>
-                                                            <option value="anthropic">anthropic</option>
-                                                            <option value="gemini">gemini</option>
-                                                        </select>
-                                                        <input x-model="api.base_url" type="text" placeholder="Base URL" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-0">
-                                                        <div class="relative flex-1">
-                                                            <input x-model="api.api_key" :type="visibleApiKeys[selectedProvider + '-' + aIdx] ? 'text' : 'password'" placeholder="API Key" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 pr-8 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-full">
-                                                            <button @click="visibleApiKeys[selectedProvider + '-' + aIdx] = !visibleApiKeys[selectedProvider + '-' + aIdx]" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                                                <svg x-show="!visibleApiKeys[selectedProvider + '-' + aIdx]" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                                                <svg x-show="visibleApiKeys[selectedProvider + '-' + aIdx]" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                                                            </button>
-                                                        </div>
-                                                        <button @click="removeProviderAPI(selectedProvider, aIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
-                                                    </div>
-                                                </template>
-                                                <div x-show="!configProviders[selectedProvider].apis || configProviders[selectedProvider].apis.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No APIs configured</div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Proxy</h3>
-                                            <input x-model="configProviders[selectedProvider].proxy" type="text" placeholder="Proxy URL (optional)" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-lg">
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
                     </div>
                 </div>
 
@@ -642,14 +424,227 @@
                         </div>
                     </div>
                 </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Routes -->
+                <div x-show="tab === 'routes'" x-cloak>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-3 gap-2">
+                                <h2 class="text-base font-bold">Routes</h2>
+                                <button @click="addRoute()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
+                            </div>
+                            <input x-model="routeFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <div class="flex-1 overflow-auto space-y-1">
+                                <template x-for="(route, id) in filteredConfigRoutes()" :key="id">
+                                    <div @click="selectedRoute = id" :class="selectedRoute === id ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-mono font-medium truncate" x-text="id"></span>
+                                            <span class="text-xs px-1.5 py-0.5 rounded" :class="apiTypeBadgeClass(route.api_type)" x-text="route.api_type"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5" x-text="(route.targets || []).length + ' targets'"></div>
+                                    </div>
+                                </template>
+                                <div x-show="Object.keys(filteredConfigRoutes()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No routes</div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                            <template x-if="!selectedRoute || !configRoutes[selectedRoute]">
+                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a route from the list to edit</div>
+                            </template>
+                            <template x-if="selectedRoute && configRoutes[selectedRoute]">
+                                <div>
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center gap-3">
+                                            <input :value="selectedRoute" @change="renameRoute(selectedRoute, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
+                                            <select x-model="configRoutes[selectedRoute].api_type" @change="for (const target of configRoutes[selectedRoute].targets || []) { for (const m of target.models || []) { if (!m.api_type) m.api_type = configRoutes[selectedRoute].api_type } }" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="anthropic">anthropic</option>
+                                                <option value="openai">openai</option>
+                                                <option value="gemini">gemini</option>
+                                            </select>
+                                        </div>
+                                        <button @click="removeRoute(selectedRoute)" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Route</button>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Target Groups</h3>
+                                            <button @click="addRouteTargetGroup(selectedRoute)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Target Group</button>
+                                        </div>
+                                        <div class="space-y-3">
+                                            <template x-for="(target, tIdx) in configRoutes[selectedRoute].targets" :key="target.__uiKey || (selectedRoute + ':target:' + tIdx)">
+                                                <div
+                                                    draggable="true"
+                                                    @dragstart="startRouteTargetDrag(selectedRoute, tIdx)"
+                                                    @dragenter.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
+                                                    @dragover.prevent="setRouteTargetDragOver(selectedRoute, tIdx)"
+                                                    @drop.prevent="dropRouteTargetGroup(selectedRoute, tIdx)"
+                                                    @dragend="clearRouteTargetDragState()"
+                                                    :class="dragOverRouteTargetIndex === tIdx ? 'ring-2 ring-blue-400 border-blue-300 dark:border-blue-700' : ''"
+                                                    class="border dark:border-gray-700 rounded-lg p-4 transition">
+                                                    <div class="flex items-center gap-3 mb-3">
+                                                        <button type="button" draggable="true" @dragstart.stop="startRouteTargetDrag(selectedRoute, tIdx)" class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Drag to reorder">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h.01M8 15h.01M12 9h.01M12 15h.01M16 9h.01M16 15h.01"/></svg>
+                                                        </button>
+                                                        <span class="text-xs font-medium text-gray-400 dark:text-gray-500 w-8" x-text="'#' + (tIdx + 1)"></span>
+                                                        <input x-model="target.name" type="text" placeholder="group name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-40">
+                                                        <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                                                            <input type="checkbox" x-model="target.enable" class="rounded border-gray-300 dark:border-gray-600">
+                                                            <span>Enable</span>
+                                                        </label>
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">Priority higher when placed earlier</span>
+                                                        <button @click="removeRouteTargetGroup(selectedRoute, tIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition ml-auto">Remove</button>
+                                                    </div>
+                                                    <div class="pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+                                                        <div class="flex items-center justify-between mb-2">
+                                                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Model Mappings</span>
+                                                            <button @click="addRouteModel(selectedRoute, tIdx)" class="text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2 py-0.5 rounded transition">+ Mapping</button>
+                                                        </div>
+                                                        <template x-for="(m, mIdx) in target.models" :key="m.__uiKey || (selectedRoute + ':target:' + tIdx + ':model:' + mIdx)">
+                                                            <div class="flex items-center gap-2 mb-1.5">
+                                                                <input x-model="m.match_model" type="text" placeholder="match_model" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                                <select @change="m.provider = $event.target.value; syncRouteModelSelection(m, selectedRoute)" x-init="$nextTick(() => { $el.value = m.provider || '' })" x-effect="$nextTick(() => { $el.value = m.provider || '' })" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-32">
+                                                                    <option value="">-- provider --</option>
+                                                                    <option x-show="m.provider && !enabledConfigProvidersForRoutes()[m.provider]" :value="m.provider" x-text="m.provider" disabled></option>
+                                                                    <template x-for="(p, pname) in enabledConfigProvidersForRoutes()" :key="pname">
+                                                                        <option :value="pname" x-text="pname"></option>
+                                                                    </template>
+                                                                </select>
+                                                                <select @change="m.model_id = $event.target.value" x-init="$nextTick(() => { $el.value = m.model_id || '' })" x-effect="$nextTick(() => { $el.value = m.model_id || '' })" :disabled="!m.provider || providerModels(m.provider).length === 0" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 w-56">
+                                                                    <option value="" x-show="!m.provider">-- model --</option>
+                                                                    <option value="" x-show="m.provider && providerModels(m.provider).length === 0">No models</option>
+                                                                    <template x-for="option in providerModelOptions(m.provider, m.model_id)" :key="option.value + ':' + option.label">
+                                                                        <option :value="option.value" x-text="option.label" :disabled="option.missing"></option>
+                                                                    </template>
+                                                                </select>
+                                                                <select @change="setRouteModelAPI(m, $event.target.value)" x-init="$nextTick(() => { $el.value = selectedProviderApiValue(m) })" x-effect="$nextTick(() => { $el.value = selectedProviderApiValue(m) })" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-blue-500 w-44">
+                                                                    <option value="">-- api --</option>
+                                                                    <template x-for="option in providerApiOptions(m.provider, m.api_name, m.api_type)" :key="option.value">
+                                                                        <option :value="option.value" x-text="option.label" :disabled="option.missing"></option>
+                                                                    </template>
+                                                                </select>
+                                                                <button @click="removeRouteModel(selectedRoute, tIdx, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-1 rounded transition">&times;</button>
+                                                            </div>
+                                                        </template>
+                                                        <div x-show="!target.models || target.models.length === 0" class="text-xs text-gray-400 dark:text-gray-500 py-1">No model mappings</div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <div x-show="!configRoutes[selectedRoute].targets || configRoutes[selectedRoute].targets.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-4">No target groups configured</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Providers -->
+                <div x-show="tab === 'providers'" x-cloak>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-3 gap-2">
+                                <h2 class="text-base font-bold">Providers</h2>
+                                <button @click="addProvider()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition">+</button>
+                            </div>
+                            <input x-model="providerFilter" type="text" placeholder="Search..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <select x-model="providerTypeFilter" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm w-full mb-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">All Types</option>
+                                <template x-for="t in providerTypes" :key="t">
+                                    <option :value="t" x-text="t"></option>
+                                </template>
+                            </select>
+                            <div class="flex-1 overflow-auto space-y-1">
+                                <template x-for="(provider, name) in filteredConfigProviders()" :key="name">
+                                    <div @click="selectedProvider = name" :class="selectedProvider === name ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-mono font-medium truncate" x-text="name"></span>
+                                            <span x-show="provider.enable" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                        </div>
+                                        <div x-show="provider.name" class="text-xs text-gray-400 dark:text-gray-500 truncate" x-text="provider.name"></div>
+                                    </div>
+                                </template>
+                                <div x-show="Object.keys(filteredConfigProviders()).length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">No providers</div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 overflow-auto">
+                            <template x-if="!selectedProvider || !configProviders[selectedProvider]">
+                                <div class="text-center text-gray-400 dark:text-gray-500 py-16 text-sm">Select a provider from the list to edit</div>
+                            </template>
+                            <template x-if="selectedProvider && configProviders[selectedProvider]">
+                                <div>
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center gap-3">
+                                            <input :value="selectedProvider" @change="renameProvider(selectedProvider, $event.target.value)" type="text" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-base font-mono font-bold outline-none w-48 focus:ring-2 focus:ring-blue-500">
+                                            <input x-model="configProviders[selectedProvider].name" type="text" placeholder="Display name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-48">
+                                            <label class="flex items-center gap-2 text-sm cursor-pointer border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 h-[42px]">
+                                                <input x-model="configProviders[selectedProvider].enable" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                                                <span class="text-gray-600 dark:text-gray-300 text-sm" x-text="configProviders[selectedProvider].enable ? 'Enabled' : 'Disabled'"></span>
+                                            </label>
+                                        </div>
+                                        <button @click="removeProvider(selectedProvider)" class="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Remove Provider</button>
+                                    </div>
+                                    <div class="space-y-6">
+                                        <div>
+                                            <div class="flex items-center justify-between mb-2">
+                                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Models</h3>
+                                                <button @click="addProviderModel(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <template x-for="(m, mIdx) in configProviders[selectedProvider].models" :key="mIdx">
+                                                    <div class="flex items-center gap-2">
+                                                        <input x-model="m.model_id" type="text" placeholder="model_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-80">
+                                                        <button @click="removeProviderModel(selectedProvider, mIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
+                                                    </div>
+                                                </template>
+                                                <div x-show="!configProviders[selectedProvider].models || configProviders[selectedProvider].models.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No models configured</div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center justify-between mb-2">
+                                                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">APIs</h3>
+                                                <button @click="addProviderAPI(selectedProvider)" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition">+ Add API</button>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <template x-for="(api, aIdx) in configProviders[selectedProvider].apis" :key="aIdx">
+                                                    <div class="flex items-center gap-2">
+                                                        <input x-model="api.name" type="text" placeholder="name" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-24">
+                                                        <select x-model="api.api_type" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-28">
+                                                            <option value="openai">openai</option>
+                                                            <option value="anthropic">anthropic</option>
+                                                            <option value="gemini">gemini</option>
+                                                        </select>
+                                                        <input x-model="api.base_url" type="text" placeholder="Base URL" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-0">
+                                                        <div class="relative flex-1">
+                                                            <input x-model="api.api_key" :type="visibleApiKeys[selectedProvider + '-' + aIdx] ? 'text' : 'password'" placeholder="API Key" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 pr-8 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 w-full">
+                                                            <button @click="visibleApiKeys[selectedProvider + '-' + aIdx] = !visibleApiKeys[selectedProvider + '-' + aIdx]" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                                                <svg x-show="!visibleApiKeys[selectedProvider + '-' + aIdx]" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                                <svg x-show="visibleApiKeys[selectedProvider + '-' + aIdx]" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                                            </button>
+                                                        </div>
+                                                        <button @click="removeProviderAPI(selectedProvider, aIdx)" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">&times;</button>
+                                                    </div>
+                                                </template>
+                                                <div x-show="!configProviders[selectedProvider].apis || configProviders[selectedProvider].apis.length === 0" class="text-sm text-gray-400 dark:text-gray-500 py-2">No APIs configured</div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Proxy</h3>
+                                            <input x-model="configProviders[selectedProvider].proxy" type="text" placeholder="Proxy URL (optional)" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-lg">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+
 
             </div>
         </template>
     </div>
-
-    <footer class="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-        Go Agents Proxy &middot; <span class="font-mono">v1.0</span>
-    </footer>
 
     <script src="/static/app.js"></script>
 </body>
