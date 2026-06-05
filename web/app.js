@@ -4,9 +4,15 @@ function adminApp() {
         tab: 'routes',
         authenticated: false,
         apiKey: '',
+        username: '',
+        password: '',
         error: '',
         routes: {},
         providers: {},
+        builtinProviders: {},
+        showAddProviderModal: false,
+        newProviderTemplate: '',
+        providerTemplateFilter: '',
         configMessage: '',
         configError: false,
         llmLogs: [],
@@ -54,6 +60,18 @@ function adminApp() {
             const dm = localStorage.getItem('proxy_dark_mode');
             if (dm === 'true') { this.darkMode = true; document.documentElement.classList.add('dark'); }
 
+            this.initRouting();
+
+            // A token in the URL query (?token=xxx) authenticates directly.
+            let urlToken = '';
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('token')) {
+                urlToken = params.get('token') || '';
+                params.delete('token');
+                const qs = params.toString();
+                window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+            }
+
             // Try unauthenticated first to detect auth=false
             try {
                 const res = await fetch('/api/routes');
@@ -61,6 +79,7 @@ function adminApp() {
                     this.authenticated = true;
                     this.routes = await res.json();
                     await this.loadProviders();
+                    await this.loadBuiltinProviders();
                     await this.loadConfig();
                     await this.loadLLMLogs();
                     return;
@@ -69,10 +88,56 @@ function adminApp() {
                 // ignore, fall through to key-based login
             }
 
+            if (urlToken) {
+                this.apiKey = urlToken;
+                await this.login();
+                if (this.authenticated) return;
+            }
+
             const key = localStorage.getItem('proxy_api_key');
             if (key) {
                 this.apiKey = key;
                 await this.login();
+            }
+        },
+
+        initRouting() {
+            const valid = ['routes', 'providers', 'app-settings', 'users', 'tokens', 'llmlogs', 'applogs', 'test'];
+            const fromHash = () => {
+                const h = (window.location.hash || '').replace(/^#\/?/, '');
+                return valid.includes(h) ? h : null;
+            };
+            const initial = fromHash();
+            if (initial) this.tab = initial;
+            this.$watch('tab', (v) => {
+                if (valid.includes(v) && fromHash() !== v) {
+                    window.location.hash = '#/' + v;
+                }
+            });
+            window.addEventListener('hashchange', () => {
+                const t = fromHash();
+                if (t && t !== this.tab) this.tab = t;
+            });
+        },
+
+        async loginWithCredentials() {
+            this.error = '';
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: this.username, password: this.password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.apiKey = data.token || '';
+                    this.password = '';
+                    await this.login();
+                } else {
+                    this.error = 'Invalid username or password';
+                }
+            } catch (e) {
+                this.error = 'Connection error: ' + e.message;
             }
         },
 
@@ -87,6 +152,7 @@ function adminApp() {
                     localStorage.setItem('proxy_api_key', this.apiKey);
                     await this.loadRoutes();
                     await this.loadProviders();
+                    await this.loadBuiltinProviders();
                     await this.loadConfig();
                     await this.loadLLMLogs();
                 } else {
@@ -100,6 +166,8 @@ function adminApp() {
         logout() {
             this.authenticated = false;
             this.apiKey = '';
+            this.username = '';
+            this.password = '';
             localStorage.removeItem('proxy_api_key');
         },
 
@@ -125,6 +193,19 @@ function adminApp() {
                 headers: { 'x-api-key': this.apiKey }
             });
             this.providers = await res.json();
+        },
+
+        async loadBuiltinProviders() {
+            try {
+                const res = await fetch('/api/providers/builtin', {
+                    headers: { 'x-api-key': this.apiKey }
+                });
+                if (res.ok) {
+                    this.builtinProviders = await res.json();
+                }
+            } catch (e) {
+                // catalog is optional; ignore load failures
+            }
         },
 
         async loadConfig() {
@@ -358,9 +439,59 @@ function adminApp() {
 
         // Providers editing
         addProvider() {
-            const id = 'new-provider-' + Date.now();
-            this.configProviders = { ...this.configProviders, [id]: { name: '', enable: false, proxy: '', models: [], apis: [] } };
+            this.newProviderTemplate = '';
+            this.providerTemplateFilter = '';
+            this.showAddProviderModal = true;
+        },
+        availableProviderTemplates() {
+            const filter = (this.providerTemplateFilter || '').toLowerCase();
+            return Object.keys(this.builtinProviders || {})
+                .filter(key => !this.configProviders[key])
+                .filter(key => {
+                    if (!filter) return true;
+                    const name = (this.builtinProviders[key].name || '').toLowerCase();
+                    return key.toLowerCase().includes(filter) || name.includes(filter);
+                })
+                .sort((a, b) => a.localeCompare(b));
+        },
+        builtinProviderLabel(key) {
+            const p = this.builtinProviders[key];
+            const name = p && p.name ? p.name : '';
+            return name && name !== key ? `${key} — ${name}` : key;
+        },
+        selectProviderTemplate(key) {
+            this.newProviderTemplate = key;
+        },
+        cancelAddProvider() {
+            this.showAddProviderModal = false;
+        },
+        confirmAddProvider() {
+            const id = this.newProviderTemplate || 'new-provider-' + Date.now();
+            if (this.configProviders[id]) {
+                alert('Provider ID already exists');
+                return;
+            }
+            let provider;
+            const tpl = this.newProviderTemplate ? this.builtinProviders[this.newProviderTemplate] : null;
+            if (tpl) {
+                provider = {
+                    name: tpl.name || '',
+                    enable: true,
+                    proxy: tpl.proxy || '',
+                    models: (tpl.models || []).map(m => ({ model_id: typeof m === 'string' ? m : (m.model_id || '') })),
+                    apis: (tpl.apis || []).map(a => ({
+                        name: a.name || 'default',
+                        api_type: a.api_type || 'openai',
+                        base_url: a.base_url || '',
+                        api_key: a.api_key || ''
+                    }))
+                };
+            } else {
+                provider = { name: '', enable: false, proxy: '', models: [], apis: [] };
+            }
+            this.configProviders = { ...this.configProviders, [id]: provider };
             this.selectedProvider = id;
+            this.showAddProviderModal = false;
         },
         removeProvider(id) {
             const copy = { ...this.configProviders };

@@ -1,0 +1,600 @@
+88api:
+    name: 88api.shop
+    enable: true
+    models:
+        - model_id: claude-opus-4-8
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.88api.shop
+        - name: default
+          api_type: openai
+          base_url: https://api.88api.shop
+aicodemirror:
+    name: AICodeMirror
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.aicodemirror.com/api/codex/backend-api/codex
+        - name: default
+          api_type: anthropic
+          base_url: https://api.aicodemirror.com/api/claudecode
+aicoding:
+    name: AICoding
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.aicoding.sh
+        - name: default
+          api_type: anthropic
+          base_url: https://api.aicoding.sh
+aigocode:
+    name: AIGoCode
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.aigocode.com
+        - name: default
+          api_type: anthropic
+          base_url: https://api.aigocode.com
+aihubmix:
+    name: AiHubMix
+    enable: false
+    models:
+        - model_id: gpt-4o
+        - model_id: gpt-5.4
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://aihubmix.com
+        - name: codex
+          api_type: openai
+          base_url: https://aihubmix.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://aihubmix.com/v1
+azure:
+    name: Azure OpenAI
+    enable: false
+    models:
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://YOUR_RESOURCE_NAME.openai.azure.com/openai
+baidu:
+    name: Baidu Qianfan
+    enable: false
+    models:
+        - model_id: qianfan-code-latest
+    apis:
+        - name: coding
+          api_type: anthropic
+          base_url: https://qianfan.baidubce.com/anthropic/coding
+        - name: coding
+          api_type: openai
+          base_url: https://qianfan.baidubce.com/v2/coding
+bailian:
+    name: Alibaba Bailian
+    enable: true
+    models:
+        - model_id: qwen-3.6
+        - model_id: qwen3.7-max
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://dashscope.aliyuncs.com/apps/anthropic
+        - name: default
+          api_type: openai
+          base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        - name: token-plan
+          api_type: anthropic
+          base_url: https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic
+bailing:
+    name: BaiLing
+    enable: false
+    models:
+        - model_id: Ling-2.5-1T
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.tbox.cn/v1
+bedrock:
+    name: aws
+    enable: false
+    models:
+        - model_id: global.anthropic.claude-opus-4-7
+        - model_id: global.anthropic.claude-sonnet-4-6
+        - model_id: global.anthropic.claude-haiku-4-5-20251001-v1:0
+        - model_id: us.amazon.nova-pro-v1:0
+        - model_id: us.meta.llama4-maverick-17b-instruct-v1:0
+        - model_id: us.deepseek.r1-v1:0
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: ""
+        - name: us-west-2
+          api_type: anthropic
+          base_url: https://bedrock-runtime.us-west-2.amazonaws.com
+        - name: us-east-1
+          api_type: anthropic
+          base_url: https://bedrock-runtime.us-east-1.amazonaws.com
+claude:
+    enable: false
+    models:
+        - model_id: claude-opus-4.7
+        - model_id: claude-sonnet-4.7
+        - model_id: claude-haiku-4.7
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.anthropic.com/v1
+compshare:
+    name: Compshare
+    enable: false
+    models:
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.modelverse.cn/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.modelverse.cn/v1
+compshare-coding:
+    name: Compshare Coding Plan
+    enable: false
+    models:
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://cp.compshare.cn/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://cp.compshare.cn/v1
+crazyrouter:
+    name: CrazyRouter
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://crazyrouter.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://crazyrouter.com
+ctok:
+    name: CTok.ai
+    enable: false
+    models:
+        - model_id: claude-opus-4-7
+        - model_id: claude-sonnet-4-6
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.ctok.ai/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.ctok.ai/v1
+cubence:
+    name: Cubence
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.cubence.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.cubence.com/v1
+ddshub:
+    name: DDSHub
+    enable: false
+    models:
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://www.ddshub.cc
+deepseek:
+    enable: true
+    models:
+        - model_id: deepseek-v4-pro
+        - model_id: deepseek-v4-flash
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.deepseek.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.deepseek.com/anthropic
+dmxapi:
+    name: DMXAPI
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://www.dmxapi.cn/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://www.dmxapi.cn/v1
+doubaoseed:
+    name: Doubao Seed
+    enable: false
+    models:
+        - model_id: doubao-seed-2-0-code-preview-latest
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://ark.cn-beijing.volces.com/api/coding
+        - name: default
+          api_type: openai
+          base_url: https://ark.cn-beijing.volces.com/api/v3
+e-flowcode:
+    name: E-FlowCode
+    enable: false
+    models:
+        - model_id: gpt-5.2-codex
+        - model_id: gpt-5.3-codex
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://e-flowcode.cc/v1
+extratoken:
+    name: https://extratoken.cn/
+    enable: true
+    models:
+        - model_id: qwen3.7-max
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://extratoken.cn/api/v1
+glm:
+    name: Zhipu GLM
+    enable: true
+    models:
+        - model_id: glm-5.1
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://open.bigmodel.cn/api/paas/v4
+        - name: default
+          api_type: anthropic
+          base_url: https://open.bigmodel.cn/api/anthropic
+google:
+    enable: false
+    models:
+        - model_id: gemini-2.5-flash-lite
+        - model_id: gemini-3-flash-preview
+        - model_id: gemini-3-pro-preview
+    apis:
+        - name: default
+          api_type: gemini
+          base_url: ""
+        - name: gemini
+          api_type: gemini
+          base_url: https://generativelanguage.googleapis.com
+kat-coder:
+    name: KAT-Coder
+    enable: false
+    models:
+        - model_id: KAT-Coder-Pro
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://vanchin.streamlake.ai/api/gateway/v1/endpoints/${ENDPOINT_ID}/openai
+kimi:
+    name: Moonshot
+    enable: true
+    models:
+        - model_id: kimi-for-coding
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.moonshot.cn/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.moonshot.cn/anthropic
+        - name: coding-plan
+          api_type: anthropic
+          base_url: https://api.kimi.com/coding
+lemondata:
+    name: LemonData
+    enable: false
+    models:
+        - model_id: gpt-4o
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.lemondata.cc
+        - name: codex
+          api_type: openai
+          base_url: https://api.lemondata.cc/v1
+lionccapi:
+    name: LionCCAPI
+    enable: false
+    models:
+        - model_id: claude-opus-4-7
+        - model_id: claude-sonnet-4-6
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://vibecodingapi.ai/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://vibecodingapi.ai/v1
+longcat:
+    name: Longcat
+    enable: false
+    models:
+        - model_id: LongCat-Flash-Chat
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.longcat.chat/anthropic
+        - name: default
+          api_type: openai
+          base_url: https://api.longcat.chat/v1
+micu:
+    name: Micu
+    enable: false
+    models:
+        - model_id: claude-opus-4-7
+        - model_id: claude-sonnet-4-6
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://www.openclaudecode.cn/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://www.openclaudecode.cn/v1
+mimo:
+    name: Xiaomi MiMo
+    enable: true
+    models:
+        - model_id: mimo-v2.5-pro
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.xiaomimimo.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://api.xiaomimimo.com/anthropic
+        - name: token-plan
+          api_type: openai
+          base_url: https://token-plan-cn.xiaomimimo.com/v1
+        - name: token-plan
+          api_type: anthropic
+          base_url: https://token-plan-cn.xiaomimimo.com/anthropic
+minimax:
+    name: MiniMax
+    enable: true
+    models:
+        - model_id: MiniMax-M2.7
+        - model_id: MiniMax-M2.7-highspeed
+        - model_id: MiniMax-M3
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.minimaxi.com/anthropic
+        - name: default
+          api_type: openai
+          base_url: https://api.minimaxi.com/v1
+        - name: en
+          api_type: anthropic
+          base_url: https://api.minimax.io/anthropic
+        - name: en
+          api_type: openai
+          base_url: https://api.minimax.io/v1
+modelscope:
+    name: ModelScope
+    enable: false
+    models:
+        - model_id: ZhipuAI/GLM-5
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api-inference.modelscope.cn
+        - name: default
+          api_type: openai
+          base_url: https://api-inference.modelscope.cn/v1
+novita:
+    name: Novita AI
+    enable: false
+    models:
+        - model_id: zai-org/glm-5
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.novita.ai/anthropic
+        - name: default
+          api_type: openai
+          base_url: https://api.novita.ai/openai
+nvidia:
+    name: Nvidia
+    enable: false
+    models:
+        - model_id: moonshotai/kimi-k2.5
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://integrate.api.nvidia.com/v1
+openai:
+    enable: true
+    models:
+        - model_id: gpt-5.5
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.openai.com/v1
+openrouter:
+    enable: true
+    proxy: http://10.1.2.12:8118
+    models:
+        - model_id: openai/gpt-5.5
+        - model_id: openai/gpt-5.4
+        - model_id: anthropic/claude-opus-4.7
+        - model_id: anthropic/claude-sonnet-4.7
+        - model_id: anthropic/claude-haiku-4.7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://openrouter.ai/api/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://openrouter.ai/api
+packycode:
+    name: PackyCode
+    enable: false
+    models:
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-opus-4-7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://www.packyapi.com/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://www.packyapi.com/v1
+pipellm:
+    name: PIPELLM
+    enable: false
+    models:
+        - model_id: claude-opus-4-7
+        - model_id: claude-sonnet-4-6
+        - model_id: claude-haiku-4-5-20251001
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://cc-api.pipellm.ai
+        - name: codex
+          api_type: openai
+          base_url: https://cc-api.pipellm.ai/v1
+rightcode:
+    name: RightCode
+    enable: false
+    models:
+        - model_id: gpt-5.4
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://right.codes/codex/v1
+shengsuanyun:
+    name: Shengsuanyun
+    enable: false
+    models:
+        - model_id: claude-opus-4-7
+        - model_id: claude-sonnet-4-6
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://router.shengsuanyun.com/api/v1
+siliconflow:
+    name: SiliconFlow
+    enable: false
+    models:
+        - model_id: Pro/MiniMaxAI/MiniMax-M2.7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.siliconflow.cn
+siliconflow-en:
+    name: SiliconFlow EN
+    enable: false
+    models:
+        - model_id: MiniMaxAI/MiniMax-M2.7
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.siliconflow.com
+sssaicode:
+    name: SSSAiCode
+    enable: true
+    proxy: http://10.1.2.12:8118
+    models:
+        - model_id: gpt-5.5
+        - model_id: claude-opus-4-8
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://node-hk.sssaicode.com/api/v1
+        - name: default
+          api_type: anthropic
+          base_url: https://node-hk.sssaicode.com/api/v1
+stepfun:
+    name: StepFun
+    enable: false
+    models:
+        - model_id: step-3.5-flash-2603
+        - model_id: step-3.5-flash
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.stepfun.com/step_plan
+        - name: default
+          api_type: openai
+          base_url: https://api.stepfun.com/step_plan/v1
+stepfun-en:
+    name: StepFun EN
+    enable: false
+    models:
+        - model_id: step-3.5-flash-2603
+        - model_id: step-3.5-flash
+    apis:
+        - name: default
+          api_type: anthropic
+          base_url: https://api.stepfun.ai/step_plan
+        - name: default
+          api_type: openai
+          base_url: https://api.stepfun.ai/step_plan/v1
+therouter:
+    name: TheRouter
+    enable: false
+    models:
+        - model_id: anthropic/claude-sonnet-4.6
+        - model_id: openai/gpt-5.3-codex
+        - model_id: openai/gpt-5.2
+        - model_id: google/gemini-3-flash-preview
+        - model_id: qwen/qwen3-coder-480b
+    apis:
+        - name: default
+          api_type: openai
+          base_url: https://api.therouter.ai
+        - name: codex
+          api_type: openai
+          base_url: https://api.therouter.ai/v1
+vercel:
+    enable: false
+    models:
+        - model_id: gpt-4o
+        - model_id: gpt-4o-mini
+    apis:
+        - name: default
+          api_type: openai
+          base_url: ""
+

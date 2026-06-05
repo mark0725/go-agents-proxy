@@ -60,7 +60,7 @@
                     <svg x-show="darkMode" class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
                 <div x-show="authenticated" class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="apiKey.substring(0,8)+'...'"></span>
+                    <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="username || (apiKey.substring(0,8)+'...')"></span>
                     <button @click="logout()" class="text-sm text-gray-500 hover:text-red-600 px-3 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition">Logout</button>
                 </div>
             </div>
@@ -75,14 +75,18 @@
                 <div class="text-center mb-6">
                     <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-4 shadow-sm">Go</div>
                     <h2 class="text-xl font-bold">Welcome</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your API key to access the dashboard</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in with your username and password</p>
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key</label>
-                        <input x-model="apiKey" @keydown.enter="login()" type="password" placeholder="sk-..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2.5 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Username</label>
+                        <input x-model="username" @keydown.enter="loginWithCredentials()" type="text" placeholder="admin" autocomplete="username" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2.5 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
                     </div>
-                    <button @click="login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition shadow-sm">Login</button>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Password</label>
+                        <input x-model="password" @keydown.enter="loginWithCredentials()" type="password" placeholder="••••••••" autocomplete="current-password" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2.5 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                    </div>
+                    <button @click="loginWithCredentials()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition shadow-sm">Login</button>
                     <p x-show="error" x-text="error" x-transition class="text-red-500 text-sm text-center"></p>
                 </div>
             </div>
@@ -102,7 +106,7 @@
 
                 <!-- Settings -->
                 <div x-show="['app-settings','users','tokens','llmlogs','applogs','test'].includes(tab)" x-cloak>
-                    <div class="grid grid-cols-1 xl:grid-cols-6 gap-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-6 gap-4">
                         <aside class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4 h-fit">
                             <h2 class="text-base font-bold mb-4">Settings</h2>
                             <div class="space-y-5">
@@ -129,7 +133,7 @@
                                 </div>
                             </div>
                         </aside>
-                        <div class="xl:col-span-5 min-w-0">
+                        <div class="lg:col-span-5 min-w-0">
                             <div x-show="tab === 'app-settings'" x-cloak>
                                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
                                     <h2 class="text-lg font-bold mb-4">Application Settings</h2>
@@ -557,10 +561,15 @@
                             </select>
                             <div class="flex-1 overflow-auto space-y-1">
                                 <template x-for="(provider, name) in filteredConfigProviders()" :key="name">
-                                    <div @click="selectedProvider = name" :class="selectedProvider === name ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="cursor-pointer border rounded-lg px-3 py-2 transition">
-                                        <div class="flex items-center justify-between">
+                                    <div @click="selectedProvider = name" :class="selectedProvider === name ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'" class="group cursor-pointer border rounded-lg px-3 py-2 transition">
+                                        <div class="flex items-center justify-between gap-2">
                                             <span class="text-sm font-mono font-medium truncate" x-text="name"></span>
-                                            <span x-show="provider.enable" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                            <div class="flex items-center gap-2 shrink-0">
+                                                <span x-show="provider.enable" class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                                <button @click.stop="removeProvider(name)" title="Delete provider" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div x-show="provider.name" class="text-xs text-gray-400 dark:text-gray-500 truncate" x-text="provider.name"></div>
                                     </div>
@@ -640,6 +649,28 @@
                     </div>
                 </div>
 
+                <div x-show="showAddProviderModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @keydown.escape.window="cancelAddProvider()">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 w-full max-w-md p-6" @click.outside="cancelAddProvider()">
+                        <h3 class="text-base font-bold mb-4">Add Provider</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <input x-model="providerTemplateFilter" type="text" placeholder="Search providers..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm w-full mb-2 outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg max-h-48 overflow-auto divide-y divide-gray-100 dark:divide-gray-700">
+                                    <button type="button" @click="selectProviderTemplate('')" :class="newProviderTemplate === '' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : ''" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">Custom (empty)</button>
+                                    <template x-for="key in availableProviderTemplates()" :key="key">
+                                        <button type="button" @click="selectProviderTemplate(key)" :class="newProviderTemplate === key ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : ''" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition" x-text="builtinProviderLabel(key)"></button>
+                                    </template>
+                                    <div x-show="availableProviderTemplates().length === 0" class="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No matching providers</div>
+                                </div>
+                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Pick a built-in provider to auto-fill its models and API endpoints, or choose Custom to enter everything manually.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 mt-6">
+                            <button @click="cancelAddProvider()" class="text-sm px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancel</button>
+                            <button @click="confirmAddProvider()" class="text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">Add</button>
+                        </div>
+                    </div>
+                </div>
 
 
             </div>

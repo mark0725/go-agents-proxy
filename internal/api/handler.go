@@ -37,9 +37,12 @@ func (h *Handler) validateAdminAPIKey(r *http.Request) bool {
 			apiKey = strings.TrimPrefix(authHeader, "Bearer ")
 		}
 	}
+	if apiKey == "" {
+		return false
+	}
 
 	for _, u := range cfg.Users {
-		if u.Token == apiKey || u.Password == apiKey {
+		if (u.Token != "" && u.Token == apiKey) || (u.Password != "" && u.Password == apiKey) {
 			return true
 		}
 	}
@@ -76,11 +79,52 @@ func sendValidationError(w http.ResponseWriter, errs []config.ValidationError) {
 
 // RegisterRoutes registers all /api/* handlers.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/login", h.handleLogin)
 	mux.HandleFunc("/api/config", h.handleConfig)
 	mux.HandleFunc("/api/logs/llm", h.handleLLMLogs)
 	mux.HandleFunc("/api/logs/app", h.handleAppLogs)
 	mux.HandleFunc("/api/routes", h.handleRoutes)
 	mux.HandleFunc("/api/providers", h.handleProviders)
+	mux.HandleFunc("/api/providers/builtin", h.handleBuiltinProviders)
+}
+
+func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	cfg := h.Config.Get()
+	if !cfg.App.Auth {
+		sendJSON(w, http.StatusOK, map[string]string{"token": ""})
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		sendError(w, http.StatusBadRequest, "Failed to read body")
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		sendError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
+		return
+	}
+
+	for _, u := range cfg.Users {
+		if u.Name == req.Username && u.Password != "" && u.Password == req.Password {
+			token := u.Token
+			if token == "" {
+				token = u.Password
+			}
+			sendJSON(w, http.StatusOK, map[string]string{"token": token, "name": u.Name})
+			return
+		}
+	}
+	sendError(w, http.StatusUnauthorized, "Invalid username or password")
 }
 
 func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request) {
@@ -253,4 +297,18 @@ func (h *Handler) handleProviders(w http.ResponseWriter, r *http.Request) {
 
 	cfg := h.Config.Get()
 	sendJSON(w, http.StatusOK, cfg.Providers)
+}
+
+func (h *Handler) handleBuiltinProviders(w http.ResponseWriter, r *http.Request) {
+	if !h.validateAdminAPIKey(r) {
+		sendError(w, http.StatusUnauthorized, "Invalid API key")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		sendError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	sendJSON(w, http.StatusOK, config.BuiltinProviders())
 }
